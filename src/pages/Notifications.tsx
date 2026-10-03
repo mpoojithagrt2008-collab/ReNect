@@ -7,6 +7,7 @@ import {
   Recycle,
   CheckCheck,
   Inbox,
+  Star,
 } from 'lucide-react';
 import { useApp } from '../store';
 import type { Page } from '../components/Navigation';
@@ -21,6 +22,7 @@ const TYPE_ICONS: Record<string, typeof Bell> = {
   accepted: CheckCircle2,
   rejected: XCircle,
   available: Recycle,
+  rental_completed: Star,
   info: Bell,
 };
 
@@ -29,6 +31,7 @@ const TYPE_COLORS: Record<string, string> = {
   accepted: 'bg-emerald-50 text-emerald-600',
   rejected: 'bg-red-50 text-red-500',
   available: 'bg-teal-50 text-teal-600',
+  rental_completed: 'bg-amber-50 text-amber-500',
   info: 'bg-gray-50 text-gray-500',
 };
 
@@ -51,7 +54,9 @@ export function Notifications({ navigate }: Props) {
 
   const handleClick = (notif: AppNotification) => {
     markNotificationRead(notif.id);
-    if (notif.listingId) {
+    if (notif.type === 'rental_completed') {
+      navigate('rentals');
+    } else if (notif.listingId) {
       setSelectedItemId(notif.listingId);
       navigate('explore');
     }

@@ -1,5 +1,5 @@
 import { Heart, Star } from 'lucide-react';
-import { VerifiedBadge, ConditionBadge, formatPrice } from './ui';
+import { VerifiedBadge, ConditionBadge, formatPrice, formatOwnerName } from './ui';
 import type { Item, ListingRating } from '../types';
 
 interface Props {
@@ -44,7 +44,7 @@ export function ItemCard({ item, onClick, isFavorite, onToggleFavorite, rating }
             {item.name}
           </h3>
           <div className="flex items-center gap-1.5">
-            <span className="text-xs text-gray-500">by {item.ownerName}</span>
+            <span className="text-xs text-gray-500">by {formatOwnerName(item.ownerName, item.ownerStudentId)}</span>
             <VerifiedBadge verified={item.verified} />
           </div>
           {rating && rating.reviewCount > 0 && (
@@ -64,7 +64,7 @@ export function ItemCard({ item, onClick, isFavorite, onToggleFavorite, rating }
           )}
           <div className="mt-auto flex items-center justify-between pt-2">
             <span className="text-base font-bold text-emerald-600">
-              {formatPrice(item.pricePerDay)}
+              {formatPrice(item.pricePerDay, item.pricingType)}
             </span>
             <span className="text-xs text-gray-400">{item.category}</span>
           </div>

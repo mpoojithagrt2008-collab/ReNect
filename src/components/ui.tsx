@@ -33,9 +33,14 @@ export function VerifiedBadge({ verified }: { verified: boolean }) {
   );
 }
 
-export function formatPrice(pricePerDay: number): string {
+export function formatPrice(pricePerDay: number, pricingType: 'hour' | 'day' = 'day'): string {
   if (pricePerDay === 0) return 'Free';
-  return `₹${pricePerDay}/day`;
+  return `₹${pricePerDay}/${pricingType === 'hour' ? 'hour' : 'day'}`;
+}
+
+export function formatOwnerName(name: string, studentId: string): string {
+  if (!studentId) return name;
+  return `${name} (${studentId})`;
 }
 
 export function StarRatingDisplay({ rating, count, size = 'h-4 w-4' }: { rating: number; count?: number; size?: string }) {

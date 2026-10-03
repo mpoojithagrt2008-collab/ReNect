@@ -5,12 +5,15 @@ import {
   XCircle,
   MessageCircle,
   Star,
+  PackageCheck,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useApp } from '../store';
+import { formatOwnerName } from '../components/ui';
 import type { Page } from '../components/Navigation';
 import type { BorrowRequest, RequestStatus } from '../types';
 import { RatingReview } from '../components/RatingReview';
+import { ReturnItemModal } from '../components/ReturnItemModal';
 
 interface Props {
   navigate: (p: Page) => void;
@@ -37,10 +40,11 @@ function formatDate(dateStr: string): string {
 }
 
 export function MyRentals({ navigate }: Props) {
-  const { requests, user, setActiveChatRequestId, reviewedRequestIds, submitReview } = useApp();
+  const { requests, user, setActiveChatRequestId, reviewedRequestIds, submitReview, profilesMap, returnsMap, submitReturn } = useApp();
   const [reviewingReq, setReviewingReq] = useState<BorrowRequest | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [reviewSuccess, setReviewSuccess] = useState<string | null>(null);
+  const [returningReq, setReturningReq] = useState<BorrowRequest | null>(null);
 
   const myRequests = requests.filter((r) => r.requesterId === user?.id);
   const activeRentals = myRequests.filter((r) => r.status === 'pending' || r.status === 'accepted');
@@ -60,27 +64,56 @@ export function MyRentals({ navigate }: Props) {
     }
   };
 
+  const handleReturnSubmit = async (photoFile: File, condition: 'good' | 'minor_damage' | 'damaged', note: string) => {
+    if (!returningReq) return { error: 'No rental selected.' };
+    const result = await submitReturn(returningReq.id, returningReq.listingId, photoFile, condition, note);
+    return result;
+  };
+
   const RentalCard = ({ req }: { req: BorrowRequest }) => {
     const StatusIcon = STATUS_ICONS[req.status];
     const canReview = req.status === 'completed' && !reviewedRequestIds.has(req.id);
     const hasReviewed = req.status === 'completed' && reviewedRequestIds.has(req.id);
+    const hasReturn = !!returnsMap[req.id];
 
     return (
       <div className="flex flex-col gap-3 rounded-2xl border border-gray-200 bg-white p-4 transition-shadow hover:shadow-sm sm:flex-row sm:items-center">
         <img src={req.itemImage} alt={req.itemName} className="h-16 w-16 shrink-0 rounded-xl object-cover" />
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-sm font-semibold text-gray-900">{req.itemName}</h3>
-          <p className="text-xs text-gray-500">From {req.ownerName}</p>
+          <p className="text-xs text-gray-500">From {formatOwnerName(req.ownerName, profilesMap[req.ownerId]?.studentId || '')}</p>
           <div className="mt-1 flex items-center gap-3 text-xs text-gray-400">
             <span>{formatDate(req.startDate)} → {formatDate(req.endDate)}</span>
           </div>
+          {hasReturn && (
+            <div className="mt-1.5 flex items-center gap-1 text-xs font-medium text-teal-600">
+              <PackageCheck className="h-3.5 w-3.5" />
+              Return submitted — awaiting owner review
+            </div>
+          )}
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           <div className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold capitalize ring-1 ring-inset ${STATUS_STYLES[req.status]}`}>
             <StatusIcon className="h-3.5 w-3.5" />
             {req.status}
           </div>
-          {req.status === 'accepted' && (
+          {req.status === 'accepted' && !hasReturn && (
+            <>
+              <button
+                onClick={() => { setActiveChatRequestId(req.id); navigate('messages'); }}
+                className="flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
+              >
+                <MessageCircle className="h-3.5 w-3.5" /> Chat
+              </button>
+              <button
+                onClick={() => setReturningReq(req)}
+                className="flex items-center gap-1.5 rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-teal-700"
+              >
+                <PackageCheck className="h-3.5 w-3.5" /> Return Item
+              </button>
+            </>
+          )}
+          {req.status === 'accepted' && hasReturn && (
             <button
               onClick={() => { setActiveChatRequestId(req.id); navigate('messages'); }}
               className="flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
@@ -158,6 +191,14 @@ export function MyRentals({ navigate }: Props) {
           ownerName={reviewingReq.ownerName}
           onSubmit={handleReviewSubmit}
           onClose={() => { setReviewingReq(null); setReviewError(null); }}
+        />
+      )}
+
+      {returningReq && (
+        <ReturnItemModal
+          itemName={returningReq.itemName}
+          onSubmit={handleReturnSubmit}
+          onClose={() => setReturningReq(null)}
         />
       )}
 

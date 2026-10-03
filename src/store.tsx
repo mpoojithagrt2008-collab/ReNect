@@ -11,7 +11,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
 import type { Item, BorrowRequest, UserProfile, RequestStatus, Availability, AppNotification, ChatMessage, Favorite, Review, ListingRating, ReturnRecord, DamagePenalty, PaymentRecord, ReturnCondition, PaymentMethod } from './types';
 import { PLACEHOLDER_IMAGES } from './data';
-import type { Category, Condition } from './types';
+import type { Category, Condition, PricingType } from './types';
 
 interface AppContextType {
   user: UserProfile | null;
@@ -31,6 +31,7 @@ interface AppContextType {
     description: string;
     condition: Condition;
     pricePerDay: number;
+    pricingType: 'hour' | 'day';
     location: string;
     imageFile: File | null;
   }) => Promise<{ error: string | null }>;
@@ -110,6 +111,7 @@ function parseItem(row: any, ownerName: string, ownerVerified: boolean, ownerStu
     description: row.description,
     condition: row.condition as Condition,
     pricePerDay: row.price_per_day,
+    pricingType: (row.pricing_type as 'hour' | 'day') || 'day',
     location: row.location,
     image: row.image_url || PLACEHOLDER_IMAGES[(row.category as Category) || 'Other'],
     ownerId: row.owner_id,
@@ -1234,6 +1236,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     description: string;
     condition: Condition;
     pricePerDay: number;
+    pricingType: 'hour' | 'day';
     location: string;
     imageFile: File | null;
   }): Promise<{ error: string | null }> => {
@@ -1258,6 +1261,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       category: data.category,
       condition: data.condition,
       price_per_day: data.pricePerDay,
+      pricing_type: data.pricingType,
       location: data.location || 'Campus',
       image_url: imageUrl,
       status: 'active',
@@ -1360,7 +1364,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!user) return { error: 'Not logged in.' };
     const { data: req, error: fetchErr } = await supabase
       .from('rent_requests')
-      .select('id, listing_id, status, owner_id')
+      .select('id, listing_id, status, owner_id, requester_id')
       .eq('id', requestId)
       .maybeSingle();
     if (fetchErr || !req) return { error: 'Request not found.' };
@@ -1372,6 +1376,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .eq('id', requestId);
     if (updateErr) return { error: `Failed to update: ${updateErr.message}` };
     await supabase.from('listings').update({ availability: 'available' }).eq('id', req.listing_id);
+    await supabase.from('notifications').insert({
+      user_id: req.requester_id,
+      actor_id: user.id,
+      type: 'rental_completed',
+      title: 'Rental completed',
+      body: 'Your rental has been completed. Please rate the product.',
+      listing_id: req.listing_id,
+      request_id: requestId,
+    });
     fetchRequests(user.id);
     fetchListings();
     fetchNotifications();

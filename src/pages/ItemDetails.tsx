@@ -13,11 +13,10 @@ import {
   Trash2,
   XCircle,
   Heart,
-  IdCard,
 } from 'lucide-react';
 import type { Item } from '../types';
 import { useApp } from '../store';
-import { VerifiedBadge, ConditionBadge, formatPrice, StarRatingDisplay } from '../components/ui';
+import { VerifiedBadge, ConditionBadge, formatPrice, StarRatingDisplay, formatOwnerName } from '../components/ui';
 
 interface Props {
   item: Item;
@@ -41,6 +40,20 @@ export function ItemDetails({ item, onBack }: Props) {
   const isAvailable = item.availability === 'available';
   const isFavorite = favoriteIds.has(item.id);
   const rating = ratingsMap[item.id];
+
+  // Calculate rental duration and total
+  const rentalDuration = (() => {
+    if (!startDate || !endDate) return 0;
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const diffMs = end.getTime() - start.getTime();
+    if (diffMs <= 0) return 0;
+    if (item.pricingType === 'hour') {
+      return Math.round(diffMs / (1000 * 60 * 60));
+    }
+    return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  })();
+  const rentalTotal = rentalDuration > 0 ? rentalDuration * item.pricePerDay : 0;
 
   // Fetch rating and reviews when item changes
   useEffect(() => {
@@ -79,7 +92,7 @@ export function ItemDetails({ item, onBack }: Props) {
           <h2 className="text-xl font-bold text-gray-900">Request Sent</h2>
           <p className="mt-2 max-w-sm text-sm text-gray-500">
             Your request to borrow <span className="font-semibold text-gray-700">{item.name}</span> from{' '}
-            <span className="font-semibold text-gray-700">{item.ownerName}</span> has been sent. You'll be notified once they respond.
+            <span className="font-semibold text-gray-700">{formatOwnerName(item.ownerName, item.ownerStudentId)}</span> has been sent. You'll be notified once they respond.
           </p>
           <div className="mt-6 flex gap-3">
             <button onClick={onBack} className="rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50">
@@ -128,7 +141,7 @@ export function ItemDetails({ item, onBack }: Props) {
           </div>
 
           <div className="rounded-xl bg-emerald-50 px-4 py-3">
-            <span className="text-2xl font-bold text-emerald-600">{formatPrice(item.pricePerDay)}</span>
+            <span className="text-2xl font-bold text-emerald-600">{formatPrice(item.pricePerDay, item.pricingType)}</span>
           </div>
 
           <p className="text-sm leading-relaxed text-gray-600">{item.description}</p>
@@ -148,14 +161,9 @@ export function ItemDetails({ item, onBack }: Props) {
               <User className="h-4.5 w-4.5 text-gray-400" />
               <span className="text-gray-500">Owner</span>
               <span className="ml-auto flex items-center gap-1.5 font-medium text-gray-900">
-                {item.ownerName}
+                {formatOwnerName(item.ownerName, item.ownerStudentId)}
                 <VerifiedBadge verified={item.verified} />
               </span>
-            </div>
-            <div className="flex items-center gap-3 text-sm">
-              <IdCard className="h-4.5 w-4.5 text-gray-400" />
-              <span className="text-gray-500">Student ID</span>
-              <span className="ml-auto font-medium text-gray-900">{item.ownerStudentId || 'N/A'}</span>
             </div>
           </div>
 
@@ -198,6 +206,24 @@ export function ItemDetails({ item, onBack }: Props) {
                   </div>
                 </div>
               </div>
+
+              {/* Pricing summary */}
+              {rentalDuration > 0 && (
+                <div className="rounded-lg bg-emerald-50 px-3 py-2.5 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600">Rate</span>
+                    <span className="font-medium text-gray-900">₹{item.pricePerDay}/{item.pricingType === 'hour' ? 'hour' : 'day'}</span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between">
+                    <span className="text-gray-600">Duration</span>
+                    <span className="font-medium text-gray-900">{rentalDuration} {item.pricingType === 'hour' ? 'hour' + (rentalDuration !== 1 ? 's' : '') : 'day' + (rentalDuration !== 1 ? 's' : '')}</span>
+                  </div>
+                  <div className="mt-1.5 flex items-center justify-between border-t border-emerald-200 pt-1.5">
+                    <span className="font-semibold text-gray-700">Total</span>
+                    <span className="text-base font-bold text-emerald-600">₹{rentalTotal}</span>
+                  </div>
+                </div>
+              )}
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-gray-600">Message to owner</label>
                 <div className="relative">

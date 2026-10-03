@@ -8,6 +8,7 @@ export type Category =
   | 'Other';
 
 export type Condition = 'New' | 'Like New' | 'Good' | 'Fair';
+export type PricingType = 'hour' | 'day';
 
 export type RequestStatus = 'pending' | 'accepted' | 'rejected' | 'completed';
 export type Availability = 'available' | 'unavailable';
@@ -19,6 +20,7 @@ export interface Item {
   description: string;
   condition: Condition;
   pricePerDay: number;
+  pricingType: PricingType;
   location: string;
   image: string;
   ownerId: string;

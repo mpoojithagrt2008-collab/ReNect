@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Plus,
   Package,
@@ -15,20 +15,23 @@ import {
   Loader2,
   AlertCircle,
   MessageCircle,
+  PackageCheck,
 } from 'lucide-react';
 import { useApp } from '../store';
+import { formatOwnerName } from '../components/ui';
 import { CATEGORIES, CONDITIONS } from '../data';
 import { ItemCard } from '../components/ItemCard';
-import type { Category, Condition } from '../types';
+import type { Category, Condition, PricingType } from '../types';
 
 export function MyItems({ navigate }: { navigate: (p: import('../components/Navigation').Page) => void }) {
-  const { user, items, addListing, deleteListing, requests, updateRequestStatus, markReturned, setActiveChatRequestId } = useApp();
+  const { user, items, addListing, deleteListing, requests, updateRequestStatus, markReturned, setActiveChatRequestId, profilesMap, returnsMap, getReturnPhotoUrl } = useApp();
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState('');
   const [category, setCategory] = useState<Category>('Books');
   const [description, setDescription] = useState('');
   const [condition, setCondition] = useState<Condition>('Good');
   const [price, setPrice] = useState('');
+  const [pricingType, setPricingType] = useState<PricingType>('day');
   const [location, setLocation] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -40,6 +43,7 @@ export function MyItems({ navigate }: { navigate: (p: import('../components/Navi
   const [deleting, setDeleting] = useState(false);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
+  const [returnPhotoUrls, setReturnPhotoUrls] = useState<Record<string, string>>({});
 
   const myListings = useMemo(
     () => items.filter((i) => i.ownerId === user?.id),
@@ -51,12 +55,27 @@ export function MyItems({ navigate }: { navigate: (p: import('../components/Navi
     [requests, user],
   );
 
+  // Fetch return photos for incoming requests that have a return record
+  useEffect(() => {
+    for (const req of incomingRequests) {
+      const ret = returnsMap[req.id];
+      if (ret && !returnPhotoUrls[req.id]) {
+        getReturnPhotoUrl(req.id).then((url) => {
+          if (url) {
+            setReturnPhotoUrls((prev) => ({ ...prev, [req.id]: url }));
+          }
+        });
+      }
+    }
+  }, [incomingRequests, returnsMap, returnPhotoUrls, getReturnPhotoUrl]);
+
   const resetForm = () => {
     setName('');
     setCategory('Books');
     setDescription('');
     setCondition('Good');
     setPrice('');
+    setPricingType('day');
     setLocation('');
     setImageFile(null);
     setImagePreview(null);
@@ -99,6 +118,7 @@ export function MyItems({ navigate }: { navigate: (p: import('../components/Navi
       description,
       condition,
       pricePerDay: price ? Number(price) : 0,
+      pricingType,
       location: location || 'Campus',
       imageFile,
     });
@@ -289,7 +309,29 @@ export function MyItems({ navigate }: { navigate: (p: import('../components/Navi
 
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                Price per day (₹) <span className="text-gray-400">— 0 for free</span>
+                Pricing Type
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPricingType('hour')}
+                  className={`rounded-xl border-2 px-4 py-2.5 text-sm font-medium transition-all ${pricingType === 'hour' ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'}`}
+                >
+                  Per Hour
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPricingType('day')}
+                  className={`rounded-xl border-2 px-4 py-2.5 text-sm font-medium transition-all ${pricingType === 'day' ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'}`}
+                >
+                  Per Day
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                Price per {pricingType === 'hour' ? 'hour' : 'day'} (₹) <span className="text-gray-400">— 0 for free</span>
               </label>
               <input
                 type="number"
@@ -365,7 +407,7 @@ export function MyItems({ navigate }: { navigate: (p: import('../components/Navi
                   <div className="min-w-0 flex-1">
                     <h3 className="truncate text-sm font-semibold text-gray-900">{req.itemName}</h3>
                     <p className="text-xs text-gray-500">
-                      Requested by <span className="font-medium text-gray-700">{req.requesterName}</span>
+                      Requested by <span className="font-medium text-gray-700">{formatOwnerName(req.requesterName, profilesMap[req.requesterId]?.studentId || '')}</span>
                     </p>
                     <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-400">
                       <span className="flex items-center gap-1">
@@ -377,6 +419,51 @@ export function MyItems({ navigate }: { navigate: (p: import('../components/Navi
                       <div className="mt-2 flex items-start gap-1.5 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600">
                         <MessageSquare className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400" />
                         <span>{req.message}</span>
+                      </div>
+                    )}
+                    {returnsMap[req.id] && (
+                      <div className="mt-3 rounded-xl border border-teal-200 bg-teal-50/50 p-3">
+                        <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-teal-700">
+                          <PackageCheck className="h-4 w-4" />
+                          Return Submitted by Borrower
+                        </div>
+                        <div className="flex gap-3">
+                          {returnPhotoUrls[req.id] ? (
+                            <img
+                              src={returnPhotoUrls[req.id]}
+                              alt="Return proof"
+                              className="h-20 w-20 shrink-0 rounded-lg border border-teal-200 object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg border border-teal-200 bg-teal-100/50">
+                              <Loader2 className="h-5 w-5 animate-spin text-teal-400" />
+                            </div>
+                          )}
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <div className="flex items-center gap-2 text-xs">
+                              <span className="text-gray-500">Condition:</span>
+                              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                returnsMap[req.id].returnCondition === 'good'
+                                  ? 'bg-emerald-100 text-emerald-700'
+                                  : returnsMap[req.id].returnCondition === 'minor_damage'
+                                    ? 'bg-amber-100 text-amber-700'
+                                    : 'bg-red-100 text-red-600'
+                              }`}>
+                                {returnsMap[req.id].returnCondition === 'good'
+                                  ? 'Good Condition'
+                                  : returnsMap[req.id].returnCondition === 'minor_damage'
+                                    ? 'Minor Damage'
+                                    : 'Damaged'}
+                              </span>
+                            </div>
+                            {returnsMap[req.id].returnNote && (
+                              <div className="text-xs text-gray-600">
+                                <span className="font-medium text-gray-500">Note: </span>
+                                {returnsMap[req.id].returnNote}
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -450,7 +537,7 @@ export function MyItems({ navigate }: { navigate: (p: import('../components/Navi
                         className="flex items-center gap-1.5 rounded-lg bg-teal-600 px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-teal-700"
                       >
                         <Check className="h-3.5 w-3.5" />
-                        Mark Returned
+                        {returnsMap[req.id] ? 'Confirm Return' : 'Mark Returned'}
                       </button>
                     </div>
                   )}
