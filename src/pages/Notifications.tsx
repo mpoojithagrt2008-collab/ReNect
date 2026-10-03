@@ -1,24 +1,26 @@
 import { useState } from 'react';
 import {
   Bell, Package, CheckCircle2, XCircle, Recycle, CheckCheck, Inbox, Star, Loader2, AlertCircle,
-  MessageCircle, PackageCheck,
+  MessageCircle, PackageCheck, ClipboardCheck, Ban,
 } from 'lucide-react';
 import { useApp } from '../store';
 import type { Page } from '../components/Navigation';
 import type { AppNotification } from '../types';
+import { ReturnReviewModal } from '../components/ReturnReviewModal';
 
 interface Props { navigate: (p: Page) => void; }
 
 const TYPE_ICONS: Record<string, typeof Bell> = {
   new_request: Package, accepted: CheckCircle2, rejected: XCircle,
-  available: Recycle, rental_completed: Star, return_submitted: Package, info: Bell,
+  available: Recycle, rental_completed: Star, return_submitted: Package,
+  request_cancelled: Ban, info: Bell,
 };
 
 const TYPE_COLORS: Record<string, string> = {
   new_request: 'bg-amber-50 text-amber-600', accepted: 'bg-mint-50 text-mint-600',
   rejected: 'bg-red-50 text-red-500', available: 'bg-babyblue-50 text-babyblue-600',
   rental_completed: 'bg-amber-50 text-amber-500', return_submitted: 'bg-babyblue-50 text-babyblue-600',
-  info: 'bg-gray-50 text-gray-500',
+  request_cancelled: 'bg-gray-100 text-gray-500', info: 'bg-gray-50 text-gray-500',
 };
 
 function timeAgo(dateStr: string): string {
@@ -32,11 +34,18 @@ function timeAgo(dateStr: string): string {
 }
 
 export function Notifications({ navigate }: Props) {
-  const { notifications, markNotificationRead, markAllNotificationsRead, setSelectedItemId, unreadCount, updateRequestStatus, markReturned, setActiveChatRequestId, requests } = useApp();
+  const { user, notifications, markNotificationRead, markAllNotificationsRead, setSelectedItemId, unreadCount, updateRequestStatus, markReturned, setActiveChatRequestId, requests, returnsMap } = useApp();
   const [actingRequestId, setActingRequestId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+  const [reviewingReturnId, setReviewingReturnId] = useState<string | null>(null);
 
-  const acceptedRequestIds = new Set(requests.filter((r) => r.status === 'accepted' && r.ownerId).map((r) => r.id));
+  const pendingRequestIds = new Set(
+    requests.filter((r) => r.status === 'pending' && r.ownerId === user?.id).map((r) => r.id)
+  );
+  const acceptedRequestIds = new Set(
+    requests.filter((r) => r.status === 'accepted' && r.ownerId === user?.id).map((r) => r.id)
+  );
 
   const handleClick = (notif: AppNotification) => {
     markNotificationRead(notif.id);
@@ -61,25 +70,54 @@ export function Notifications({ navigate }: Props) {
 
   const handleAccept = async (e: React.MouseEvent, requestId: string) => {
     e.stopPropagation();
-    setActionError(null);
+    if (actingRequestId) return;
+    setActionError(null); setActionSuccess(null);
     setActingRequestId(requestId);
     const result = await updateRequestStatus(requestId, 'accepted');
     setActingRequestId(null);
-    if (result?.error) { setActionError(result.error); setTimeout(() => setActionError(null), 4000); }
+    if (result?.error) {
+      setActionError(result.error);
+      setTimeout(() => setActionError(null), 4000);
+    } else {
+      setActionSuccess('Request accepted successfully.');
+      setTimeout(() => setActionSuccess(null), 3000);
+    }
   };
 
   const handleReject = async (e: React.MouseEvent, requestId: string) => {
     e.stopPropagation();
-    setActionError(null);
+    if (actingRequestId) return;
+    setActionError(null); setActionSuccess(null);
     setActingRequestId(requestId);
     const result = await updateRequestStatus(requestId, 'rejected');
     setActingRequestId(null);
-    if (result?.error) { setActionError(result.error); setTimeout(() => setActionError(null), 4000); }
+    if (result?.error) {
+      setActionError(result.error);
+      setTimeout(() => setActionError(null), 4000);
+    } else {
+      setActionSuccess('Request rejected.');
+      setTimeout(() => setActionSuccess(null), 3000);
+    }
   };
 
-  const isPendingRequest = (n: AppNotification) => n.type === 'new_request' && n.requestId;
+  const handleReviewReturn = (e: React.MouseEvent, requestId: string) => {
+    e.stopPropagation();
+    const returnRecord = returnsMap[requestId];
+    if (returnRecord) {
+      markNotificationRead(
+        notifications.find((n) => n.requestId === requestId && n.type === 'return_submitted')?.id || ''
+      );
+      setReviewingReturnId(returnRecord.id);
+    }
+  };
+
+  const isPendingRequest = (n: AppNotification) => n.type === 'new_request' && n.requestId && pendingRequestIds.has(n.requestId);
   const isResolvedRequest = (n: AppNotification) => (n.type === 'accepted' || n.type === 'rejected') && n.requestId;
   const isAcceptedRequest = (n: AppNotification) => n.type === 'accepted' && n.requestId && acceptedRequestIds.has(n.requestId);
+  const isStalePending = (n: AppNotification) => n.type === 'new_request' && n.requestId && !pendingRequestIds.has(n.requestId);
+  const isRequestCancelled = (n: AppNotification) => n.type === 'request_cancelled' && n.requestId;
+  const isReturnSubmitted = (n: AppNotification) => n.type === 'return_submitted' && n.requestId && returnsMap[n.requestId];
+  const isReturnReviewed = (n: AppNotification) => n.type === 'return_submitted' && n.requestId && returnsMap[n.requestId]?.status === 'reviewed';
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 md:px-6 md:py-8">
@@ -99,6 +137,13 @@ export function Notifications({ navigate }: Props) {
         <div className="mb-4 flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
           <p className="text-xs text-red-600">{actionError}</p>
+        </div>
+      )}
+
+      {actionSuccess && (
+        <div className="mb-4 flex items-center gap-2 rounded-2xl border border-mint-200 bg-mint-50 px-4 py-3">
+          <CheckCircle2 className="h-4 w-4 shrink-0 text-mint-600" />
+          <p className="text-xs text-mint-700">{actionSuccess}</p>
         </div>
       )}
 
@@ -153,9 +198,40 @@ export function Notifications({ navigate }: Props) {
                     </div>
                   )}
 
+                  {isReturnSubmitted(notif) && !isReturnReviewed(notif) && (
+                    <div className="mt-3">
+                      <button onClick={(e) => handleReviewReturn(e, notif.requestId!)}
+                        className="flex items-center gap-1.5 rounded-full bg-babyblue-500 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-babyblue-600">
+                        <ClipboardCheck className="h-3.5 w-3.5" /> Review Return
+                      </button>
+                    </div>
+                  )}
+
+                  {isReturnReviewed(notif) && (
+                    <div className="mt-2 flex items-center gap-1.5 text-[11px] font-medium text-mint-600">
+                      <CheckCircle2 className="h-3 w-3 text-mint-500" /> Return confirmed — item is now available
+                    </div>
+                  )}
+
                   {resolved && !isAcceptedRequest(notif) && (
                     <div className="mt-2 flex items-center gap-1.5 text-[11px] font-medium text-gray-400">
                       {notif.type === 'accepted' ? <><CheckCircle2 className="h-3 w-3 text-mint-500" /> You accepted this request</> : <><XCircle className="h-3 w-3 text-red-400" /> You rejected this request</>}
+                    </div>
+                  )}
+
+                  {isStalePending(notif) && !isAcceptedRequest(notif) && (
+                    <div className="mt-2 flex items-center gap-1.5 text-[11px] font-medium text-gray-400">
+                      {acceptedRequestIds.has(notif.requestId!) ? (
+                        <><CheckCircle2 className="h-3 w-3 text-mint-500" /> Request accepted</>
+                      ) : (
+                        <><XCircle className="h-3 w-3 text-gray-400" /> This request has been processed</>
+                      )}
+                    </div>
+                  )}
+
+                  {isRequestCancelled(notif) && (
+                    <div className="mt-2 flex items-center gap-1.5 text-[11px] font-medium text-gray-400">
+                      <Ban className="h-3 w-3 text-gray-400" /> This request was cancelled by the requester
                     </div>
                   )}
                 </div>
@@ -174,6 +250,13 @@ export function Notifications({ navigate }: Props) {
             Explore Items
           </button>
         </div>
+      )}
+
+      {reviewingReturnId && (
+        <ReturnReviewModal
+          returnId={reviewingReturnId}
+          onClose={() => setReviewingReturnId(null)}
+        />
       )}
     </div>
   );

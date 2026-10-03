@@ -10,7 +10,7 @@ export type Category =
 export type Condition = 'New' | 'Like New' | 'Good' | 'Fair';
 export type PricingType = 'hour' | 'day';
 
-export type RequestStatus = 'pending' | 'accepted' | 'rejected' | 'completed';
+export type RequestStatus = 'pending' | 'accepted' | 'rejected' | 'completed' | 'cancelled';
 export type Availability = 'available' | 'unavailable';
 
 export interface Item {

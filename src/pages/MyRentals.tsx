@@ -1,5 +1,5 @@
 import {
-  CalendarCheck, Clock, CheckCircle2, XCircle, MessageCircle, Star, PackageCheck,
+  CalendarCheck, Clock, CheckCircle2, XCircle, MessageCircle, Star, PackageCheck, Ban, Loader2,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useApp } from '../store';
@@ -16,10 +16,11 @@ const STATUS_STYLES: Record<RequestStatus, string> = {
   accepted: 'bg-mint-50 text-mint-700 ring-mint-200',
   rejected: 'bg-red-50 text-red-600 ring-red-200',
   completed: 'bg-babyblue-50 text-babyblue-700 ring-babyblue-200',
+  cancelled: 'bg-gray-100 text-gray-500 ring-gray-200',
 };
 
 const STATUS_ICONS: Record<RequestStatus, typeof Clock> = {
-  pending: Clock, accepted: CheckCircle2, rejected: XCircle, completed: CheckCircle2,
+  pending: Clock, accepted: CheckCircle2, rejected: XCircle, completed: CheckCircle2, cancelled: Ban,
 };
 
 function formatDate(dateStr: string): string {
@@ -30,16 +31,36 @@ function formatDate(dateStr: string): string {
 }
 
 export function MyRentals({ navigate }: Props) {
-  const { requests, user, setActiveChatRequestId, reviewedRequestIds, submitReview, profilesMap, returnsMap, submitReturn } = useApp();
+  const { requests, user, setActiveChatRequestId, reviewedRequestIds, submitReview, profilesMap, returnsMap, submitReturn, cancelRequest } = useApp();
   const [reviewingReq, setReviewingReq] = useState<BorrowRequest | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [reviewSuccess, setReviewSuccess] = useState<string | null>(null);
   const [returningReq, setReturningReq] = useState<BorrowRequest | null>(null);
+  const [cancellingReq, setCancellingReq] = useState<BorrowRequest | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+  const [cancelSuccess, setCancelSuccess] = useState<string | null>(null);
 
   const myRequests = requests.filter((r) => r.requesterId === user?.id);
   const activeRentals = myRequests.filter((r) => r.status === 'pending' || r.status === 'accepted');
   const completedRentals = myRequests.filter((r) => r.status === 'completed');
   const rejectedRentals = myRequests.filter((r) => r.status === 'rejected');
+  const cancelledRentals = myRequests.filter((r) => r.status === 'cancelled');
+
+  const handleCancelConfirm = async () => {
+    if (!cancellingReq) return;
+    setCancelling(true);
+    setCancelError(null);
+    const result = await cancelRequest(cancellingReq.id);
+    setCancelling(false);
+    if (result.error) {
+      setCancelError(result.error);
+    } else {
+      setCancelSuccess('Rental request cancelled successfully.');
+      setTimeout(() => setCancelSuccess(null), 3000);
+      setCancellingReq(null);
+    }
+  };
 
   const handleReviewSubmit = async (rating: number, feedback: string) => {
     if (!reviewingReq) return;
@@ -109,6 +130,12 @@ export function MyRentals({ navigate }: Props) {
               <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> Reviewed
             </span>
           )}
+          {req.status === 'pending' && (
+            <button onClick={() => { setCancelError(null); setCancellingReq(req); }}
+              className="flex items-center gap-1.5 rounded-full bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 transition-colors hover:bg-red-100">
+              <Ban className="h-3.5 w-3.5" /> Cancel Request
+            </button>
+          )}
         </div>
       </div>
     );
@@ -123,6 +150,13 @@ export function MyRentals({ navigate }: Props) {
         <div className="mb-4 flex items-center gap-2 rounded-2xl border border-mint-200 bg-mint-50 px-4 py-3">
           <CheckCircle2 className="h-4 w-4 shrink-0 text-mint-600" />
           <p className="text-xs text-mint-700">{reviewSuccess}</p>
+        </div>
+      )}
+
+      {cancelSuccess && (
+        <div className="mb-4 flex items-center gap-2 rounded-2xl border border-mint-200 bg-mint-50 px-4 py-3">
+          <CheckCircle2 className="h-4 w-4 shrink-0 text-mint-600" />
+          <p className="text-xs text-mint-700">{cancelSuccess}</p>
         </div>
       )}
 
@@ -157,6 +191,12 @@ export function MyRentals({ navigate }: Props) {
               <div className="space-y-3">{rejectedRentals.map((req) => <RentalCard key={req.id} req={req} />)}</div>
             </div>
           )}
+          {cancelledRentals.length > 0 && (
+            <div>
+              <h2 className="mb-3 text-sm font-semibold text-gray-600">Cancelled ({cancelledRentals.length})</h2>
+              <div className="space-y-3">{cancelledRentals.map((req) => <RentalCard key={req.id} req={req} />)}</div>
+            </div>
+          )}
         </div>
       )}
 
@@ -165,6 +205,32 @@ export function MyRentals({ navigate }: Props) {
       )}
       {returningReq && (
         <ReturnItemModal itemName={returningReq.itemName} onSubmit={handleReturnSubmit} onClose={() => setReturningReq(null)} />
+      )}
+      {cancellingReq && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+          <div className="w-full max-w-sm rounded-4xl bg-white p-6 shadow-soft-lg">
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50">
+              <Ban className="h-6 w-6 text-red-500" />
+            </div>
+            <h2 className="text-lg font-bold text-gray-800">Cancel this rental request?</h2>
+            <p className="mt-2 text-sm text-gray-500">
+              Your request for <span className="font-semibold text-gray-700">{cancellingReq.itemName}</span> will be cancelled. The owner will be notified.
+            </p>
+            {cancelError && (
+              <p className="mt-3 text-xs text-red-600">{cancelError}</p>
+            )}
+            <div className="mt-6 flex gap-3">
+              <button onClick={handleCancelConfirm} disabled={cancelling}
+                className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-red-600 py-2.5 text-sm font-semibold text-white transition-all hover:bg-red-700 active:scale-[0.98] disabled:opacity-50">
+                {cancelling ? (<><Loader2 className="h-4 w-4 animate-spin" /> Cancelling...</>) : 'Cancel Request'}
+              </button>
+              <button onClick={() => { setCancellingReq(null); setCancelError(null); }} disabled={cancelling}
+                className="rounded-2xl border border-lavender-100 bg-white px-5 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-lavender-50 disabled:opacity-50">
+                Keep Request
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       {reviewError && (
         <div className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-2xl border border-red-200 bg-white px-4 py-3 shadow-soft-lg">

@@ -46,6 +46,7 @@ interface AppContextType {
     message: string;
   }) => Promise<{ error: string | null }>;
   updateRequestStatus: (id: string, status: RequestStatus) => Promise<{ error: string | null }>;
+  cancelRequest: (requestId: string) => Promise<{ error: string | null }>;
   markReturned: (requestId: string) => Promise<{ error: string | null }>;
   selectedItemId: string | null;
   setSelectedItemId: (id: string | null) => void;
@@ -82,6 +83,8 @@ interface AppContextType {
   submitReturn: (requestId: string, listingId: string, photoFile: File, condition: ReturnCondition, note: string) => Promise<{ error: string | null }>;
   fetchReturns: () => Promise<void>;
   getReturnPhotoUrl: (requestId: string) => Promise<string | null>;
+  getReturnDetails: (returnId: string) => Promise<{ returnRecord: ReturnRecord | null; request: BorrowRequest | null; renterProfile: UserProfile | null; photoUrl: string | null }>;
+  confirmReturn: (returnId: string) => Promise<{ error: string | null }>;
   damagePenalties: DamagePenalty[];
   penaltiesMap: Record<string, DamagePenalty>;
   createPenalty: (requestId: string, listingId: string, borrowerId: string, amount: number, reason: string) => Promise<{ error: string | null }>;
@@ -661,6 +664,92 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return signedUrl?.signedUrl || null;
   }, []);
 
+  const getReturnDetails = useCallback(async (returnId: string): Promise<{
+    returnRecord: ReturnRecord | null;
+    request: BorrowRequest | null;
+    renterProfile: UserProfile | null;
+    photoUrl: string | null;
+  }> => {
+    const { data: retData, error: retErr } = await supabase
+      .from('returns')
+      .select('id, request_id, listing_id, borrower_id, return_photo_url, return_condition, return_note, status, created_at')
+      .eq('id', returnId)
+      .maybeSingle();
+    if (retErr || !retData) return { returnRecord: null, request: null, renterProfile: null, photoUrl: null };
+
+    const returnRecord: ReturnRecord = {
+      id: retData.id,
+      requestId: retData.request_id,
+      listingId: retData.listing_id,
+      borrowerId: retData.borrower_id,
+      returnPhotoUrl: retData.return_photo_url,
+      returnCondition: retData.return_condition as ReturnCondition,
+      returnNote: retData.return_note || '',
+      status: retData.status as 'submitted' | 'reviewed',
+      createdAt: retData.created_at,
+    };
+
+    const { data: reqData } = await supabase
+      .from('rent_requests')
+      .select('*')
+      .eq('id', retData.request_id)
+      .maybeSingle();
+    const { data: listingData } = await supabase
+      .from('listings')
+      .select('id, title, image_url, owner_id')
+      .eq('id', retData.listing_id)
+      .maybeSingle();
+
+    let request: BorrowRequest | null = null;
+    if (reqData && listingData) {
+      const ownerProfile = profilesMap[reqData.owner_id];
+      const requesterProfile = profilesMap[reqData.requester_id];
+      request = parseRequest(
+        reqData,
+        listingData.title || 'Unknown Item',
+        listingData.image_url || '',
+        ownerProfile?.fullName || 'Unknown',
+        requesterProfile?.fullName || 'Unknown',
+      );
+    }
+
+    let renterProfile: UserProfile | null = profilesMap[retData.borrower_id] || null;
+    if (!renterProfile) {
+      const { data: pData } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, student_id, college, avatar_url')
+        .eq('id', retData.borrower_id)
+        .maybeSingle();
+      if (pData) renterProfile = parseProfile(pData);
+    }
+
+    let photoUrl: string | null = null;
+    if (retData.return_photo_url) {
+      if (retData.return_photo_url.startsWith('http')) {
+        photoUrl = retData.return_photo_url;
+      } else {
+        const { data: signedUrl } = await supabase.storage
+          .from('return-photos')
+          .createSignedUrl(retData.return_photo_url, 3600);
+        photoUrl = signedUrl?.signedUrl || null;
+      }
+    }
+
+    return { returnRecord, request, renterProfile, photoUrl };
+  }, [profilesMap]);
+
+  const confirmReturn = useCallback(async (returnId: string): Promise<{ error: string | null }> => {
+    if (!user) return { error: 'Not logged in.' };
+    const { data, error } = await supabase.rpc('confirm_return', { p_return_id: returnId });
+    if (error) return { error: 'Failed to confirm return.' };
+    if (data && data.error) return { error: data.error as string };
+    fetchReturns();
+    fetchRequests(user.id);
+    fetchListings();
+    fetchNotifications();
+    return { error: null };
+  }, [user, fetchReturns, fetchRequests, fetchListings, fetchNotifications]);
+
   const submitReturn = useCallback(async (
     requestId: string,
     listingId: string,
@@ -678,10 +767,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (uploadError) return { error: 'Failed to upload return photo.' };
       const { data: req } = await supabase
         .from('rent_requests')
-        .select('owner_id')
+        .select('owner_id, listing_id')
         .eq('id', requestId)
         .maybeSingle();
       const ownerId = req?.owner_id;
+      let itemTitle = '';
+      if (req?.listing_id) {
+        const { data: listing } = await supabase
+          .from('listings')
+          .select('title')
+          .eq('id', req.listing_id)
+          .maybeSingle();
+        itemTitle = listing?.title || '';
+      }
       const { error: insertError } = await supabase.from('returns').insert({
         request_id: requestId,
         listing_id: listingId,
@@ -701,7 +799,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           actor_id: user.id,
           type: 'return_submitted',
           title: 'Return submitted',
-          body: 'A borrower has submitted a return with photo proof. Please review it.',
+          body: itemTitle
+            ? `A return has been submitted for ${itemTitle}. Please review the return.`
+            : 'A borrower has submitted a return with photo proof. Please review it.',
           listing_id: listingId,
           request_id: requestId,
         });
@@ -889,7 +989,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
             fetchRequests(session.user.id);
             fetchFavorites();
             fetchReviewedRequestIds();
+            fetchReturns();
+            fetchPenalties();
+            fetchPayments();
             fetchUnreadMessages();
+            fetchNotifications();
           }
           setAuthLoading(false);
         });
@@ -970,8 +1074,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const notificationsChannel = supabase
       .channel('notifications-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, () => {
-        fetchNotifications();
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, (payload) => {
+        const newNotif = payload.new as any;
+        if (newNotif?.user_id && newNotif.user_id === sessionRef.current?.user?.id) {
+          fetchNotifications();
+        }
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notifications' }, (payload) => {
+        const updated = payload.new as any;
+        if (updated?.user_id && updated.user_id === sessionRef.current?.user?.id) {
+          fetchNotifications();
+        }
       })
       .subscribe();
 
@@ -1019,8 +1132,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const messagesChannel = supabase
       .channel('messages-unread-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
-        fetchUnreadMessages();
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+        const newMsg = payload.new as any;
+        if (newMsg?.receiver_id && newMsg.receiver_id === sessionRef.current?.user?.id) {
+          fetchUnreadMessages();
+        }
       })
       .subscribe();
 
@@ -1462,6 +1578,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return { error: null };
   }, [user, fetchRequests, fetchListings, fetchNotifications]);
 
+  const cancelRequest = useCallback(async (requestId: string): Promise<{ error: string | null }> => {
+    if (!user) return { error: 'Not logged in.' };
+    const { data, error } = await supabase.rpc('cancel_rental', { p_request_id: requestId });
+    if (error) return { error: 'Failed to cancel request.' };
+    if (data && data.error) return { error: data.error as string };
+    fetchRequests(user.id);
+    fetchNotifications();
+    return { error: null };
+  }, [user, fetchRequests, fetchNotifications]);
+
   const markReturned = useCallback(async (requestId: string): Promise<{ error: string | null }> => {
     if (!user) return { error: 'Not logged in.' };
     const { data: req, error: fetchErr } = await supabase
@@ -1512,6 +1638,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         requests,
         addRequest,
         updateRequestStatus,
+        cancelRequest,
         markReturned,
         selectedItemId,
         setSelectedItemId,
@@ -1548,6 +1675,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         submitReturn,
         fetchReturns,
         getReturnPhotoUrl,
+        getReturnDetails,
+        confirmReturn,
         damagePenalties,
         penaltiesMap,
         createPenalty,

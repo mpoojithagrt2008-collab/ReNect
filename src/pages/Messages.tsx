@@ -15,6 +15,7 @@ const STATUS_STYLES: Record<RequestStatus, string> = {
   accepted: 'bg-mint-50 text-mint-700 ring-mint-200',
   rejected: 'bg-red-50 text-red-600 ring-red-200',
   completed: 'bg-babyblue-50 text-babyblue-700 ring-babyblue-200',
+  cancelled: 'bg-gray-100 text-gray-500 ring-gray-200',
 };
 
 function formatDate(dateStr: string): string {
