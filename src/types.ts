@@ -50,6 +50,7 @@ export interface UserProfile {
   email: string;
   studentId: string;
   college: string;
+  avatarUrl: string | null;
 }
 
 export interface ChatMessage {
@@ -71,4 +72,17 @@ export interface Conversation {
   borrowerId: string;
   borrowerName: string;
   messages: ChatMessage[];
+}
+
+export interface AppNotification {
+  id: string;
+  userId: string;
+  actorId: string | null;
+  type: string;
+  title: string;
+  body: string | null;
+  listingId: string | null;
+  requestId: string | null;
+  read: boolean;
+  createdAt: string;
 }

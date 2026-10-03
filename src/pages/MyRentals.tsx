@@ -3,6 +3,7 @@ import {
   Clock,
   CheckCircle2,
   XCircle,
+  MessageCircle,
 } from 'lucide-react';
 import { useApp } from '../store';
 import type { Page } from '../components/Navigation';
@@ -33,7 +34,7 @@ function formatDate(dateStr: string): string {
 }
 
 export function MyRentals({ navigate }: Props) {
-  const { requests, user } = useApp();
+  const { requests, user, setActiveChatRequestId } = useApp();
 
   const myRequests = requests.filter((r) => r.requesterId === user?.id);
 
@@ -67,6 +68,18 @@ export function MyRentals({ navigate }: Props) {
             <StatusIcon className="h-3.5 w-3.5" />
             {req.status}
           </div>
+          {req.status === 'accepted' && (
+            <button
+              onClick={() => {
+                setActiveChatRequestId(req.id);
+                navigate('messages');
+              }}
+              className="flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
+            >
+              <MessageCircle className="h-3.5 w-3.5" />
+              Chat
+            </button>
+          )}
         </div>
       </div>
     );

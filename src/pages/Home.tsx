@@ -5,10 +5,8 @@ import {
   TrendingUp,
   Sparkles,
   ArrowRight,
-  Recycle,
   Package,
   Repeat,
-  IndianRupee,
   Clock,
   Loader2,
 } from 'lucide-react';
@@ -228,49 +226,6 @@ export function Home({ navigate }: Props) {
             <p className="text-sm text-gray-400">No items have been listed yet.</p>
           </div>
         )}
-      </div>
-
-      {/* Sustainability mini-stats */}
-      <div className="overflow-hidden rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 p-5 md:p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100">
-              <Recycle className="h-5 w-5 text-emerald-600" />
-            </div>
-            <div>
-              <h2 className="text-base font-semibold text-gray-900">Campus Sustainability</h2>
-              <p className="text-xs text-gray-500">Demo statistics for illustration</p>
-            </div>
-          </div>
-          <button
-            onClick={() => navigate('sustainability')}
-            className="shrink-0 text-sm font-medium text-emerald-600 hover:text-emerald-700"
-          >
-            Details →
-          </button>
-        </div>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <div className="rounded-xl bg-white/80 p-3.5 text-center">
-            <Package className="mx-auto mb-1.5 h-5 w-5 text-emerald-600" />
-            <p className="text-xl font-bold text-gray-900">248</p>
-            <p className="text-[10px] text-gray-500">Items Reused</p>
-          </div>
-          <div className="rounded-xl bg-white/80 p-3.5 text-center">
-            <Repeat className="mx-auto mb-1.5 h-5 w-5 text-teal-600" />
-            <p className="text-xl font-bold text-gray-900">173</p>
-            <p className="text-[10px] text-gray-500">Successful Exchanges</p>
-          </div>
-          <div className="rounded-xl bg-white/80 p-3.5 text-center">
-            <IndianRupee className="mx-auto mb-1.5 h-5 w-5 text-cyan-600" />
-            <p className="text-xl font-bold text-gray-900">₹42,600</p>
-            <p className="text-[10px] text-gray-500">Money Saved</p>
-          </div>
-          <div className="rounded-xl bg-white/80 p-3.5 text-center">
-            <Recycle className="mx-auto mb-1.5 h-5 w-5 text-lime-600" />
-            <p className="text-xl font-bold text-gray-900">89%</p>
-            <p className="text-[10px] text-gray-500">Reuse Impact</p>
-          </div>
-        </div>
       </div>
 
       {/* Search results preview (only when searching) */}

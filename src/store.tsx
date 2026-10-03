@@ -9,7 +9,7 @@ import {
 } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
-import type { Item, BorrowRequest, UserProfile, RequestStatus, Availability } from './types';
+import type { Item, BorrowRequest, UserProfile, RequestStatus, Availability, AppNotification, ChatMessage } from './types';
 import { PLACEHOLDER_IMAGES } from './data';
 import type { Category, Condition } from './types';
 
@@ -45,6 +45,18 @@ interface AppContextType {
   selectedItemId: string | null;
   setSelectedItemId: (id: string | null) => void;
   profilesMap: Record<string, UserProfile>;
+  notifications: AppNotification[];
+  unreadCount: number;
+  markNotificationRead: (id: string) => Promise<void>;
+  markAllNotificationsRead: () => Promise<void>;
+  fetchNotifications: () => Promise<void>;
+  messages: ChatMessage[];
+  activeChatRequestId: string | null;
+  setActiveChatRequestId: (id: string | null) => void;
+  fetchMessages: (requestId: string) => Promise<void>;
+  sendMessage: (requestId: string, receiverId: string, text: string) => Promise<{ error: string | null }>;
+  updateAvatar: (file: File) => Promise<{ error: string | null }>;
+  removeAvatar: () => Promise<{ error: string | null }>;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -98,6 +110,17 @@ function parseRequest(row: any, itemName: string, itemImage: string, ownerName: 
   };
 }
 
+function parseProfile(p: any): UserProfile {
+  return {
+    id: p.id,
+    fullName: p.full_name,
+    email: p.email,
+    studentId: p.student_id || '',
+    college: p.college || '',
+    avatarUrl: p.avatar_url || null,
+  };
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -106,7 +129,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [requests, setRequests] = useState<BorrowRequest[]>([]);
   const [profilesMap, setProfilesMap] = useState<Record<string, UserProfile>>({});
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [activeChatRequestId, setActiveChatRequestId] = useState<string | null>(null);
   const sessionRef = useRef<Session | null>(null);
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   // Fetch profiles for a list of user IDs and merge into profilesMap
   const fetchProfiles = useCallback(async (userIds: string[]) => {
@@ -114,18 +142,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (uniqueIds.length === 0) return;
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, full_name, email, student_id, college')
+      .select('id, full_name, email, student_id, college, avatar_url')
       .in('id', uniqueIds);
     if (error || !data) return;
     const newMap: Record<string, UserProfile> = {};
     for (const p of data) {
-      newMap[p.id] = {
-        id: p.id,
-        fullName: p.full_name,
-        email: p.email,
-        studentId: p.student_id || '',
-        college: p.college || '',
-      };
+      newMap[p.id] = parseProfile(p);
     }
     setProfilesMap((prev) => ({ ...prev, ...newMap }));
   }, [profilesMap]);
@@ -145,26 +167,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
 
     const ownerIds = data.map((r: any) => r.owner_id);
-    // Fetch profiles if we don't have them
     const missingIds = [...new Set(ownerIds)].filter((id: string) => !profilesMap[id]);
     if (missingIds.length > 0) {
       const { data: pData } = await supabase
         .from('profiles')
-        .select('id, full_name, email, student_id, college')
+        .select('id, full_name, email, student_id, college, avatar_url')
         .in('id', missingIds);
       if (pData) {
         const newMap: Record<string, UserProfile> = { ...profilesMap };
         for (const p of pData) {
-          newMap[p.id] = {
-            id: p.id,
-            fullName: p.full_name,
-            email: p.email,
-            studentId: p.student_id || '',
-            college: p.college || '',
-          };
+          newMap[p.id] = parseProfile(p);
         }
         setProfilesMap(newMap);
-        // Build items with profile data
         const parsed = data.map((row: any) => {
           const profile = newMap[row.owner_id];
           return parseItem(row, profile?.fullName || 'Unknown', !!profile);
@@ -194,7 +208,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     if (error || !data) return;
 
-    // Fetch listing details for each request
     const listingIds = [...new Set(data.map((r: any) => r.listing_id))];
     if (listingIds.length === 0) {
       setRequests([]);
@@ -209,7 +222,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const listingMap: Record<string, any> = {};
     (listings || []).forEach((l: any) => { listingMap[l.id] = l; });
 
-    // Gather all user IDs we need profiles for
     const allUserIds = new Set<string>();
     data.forEach((r: any) => {
       allUserIds.add(r.owner_id);
@@ -221,18 +233,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (missingProfileIds.length > 0) {
       const { data: pData } = await supabase
         .from('profiles')
-        .select('id, full_name, email, student_id, college')
+        .select('id, full_name, email, student_id, college, avatar_url')
         .in('id', missingProfileIds);
       if (pData) {
         const newMap = { ...profilesMap };
         for (const p of pData) {
-          newMap[p.id] = {
-            id: p.id,
-            fullName: p.full_name,
-            email: p.email,
-            studentId: p.student_id || '',
-            college: p.college || '',
-          };
+          newMap[p.id] = parseProfile(p);
         }
         currentProfilesMap = newMap;
         setProfilesMap(newMap);
@@ -253,6 +259,153 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
     setRequests(parsed);
   }, [profilesMap]);
+
+  // Fetch notifications for current user
+  const fetchNotifications = useCallback(async () => {
+    const userId = sessionRef.current?.user?.id;
+    if (!userId) return;
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    if (error || !data) return;
+    setNotifications(data.map((n: any) => ({
+      id: n.id,
+      userId: n.user_id,
+      actorId: n.actor_id,
+      type: n.type,
+      title: n.title,
+      body: n.body,
+      listingId: n.listing_id,
+      requestId: n.request_id,
+      read: n.read,
+      createdAt: n.created_at,
+    })));
+  }, []);
+
+  // Mark a single notification as read
+  const markNotificationRead = useCallback(async (id: string) => {
+    const { error } = await supabase
+      .from('notifications')
+      .update({ read: true })
+      .eq('id', id);
+    if (!error) {
+      setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, read: true } : n));
+    }
+  }, []);
+
+  // Mark all notifications as read
+  const markAllNotificationsRead = useCallback(async () => {
+    const userId = sessionRef.current?.user?.id;
+    if (!userId) return;
+    const { error } = await supabase
+      .from('notifications')
+      .update({ read: true })
+      .eq('user_id', userId)
+      .eq('read', false);
+    if (!error) {
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    }
+  }, []);
+
+  // Fetch messages for a request
+  const fetchMessages = useCallback(async (requestId: string) => {
+    const { data, error } = await supabase
+      .from('messages')
+      .select('id, request_id, sender_id, receiver_id, body, created_at')
+      .eq('request_id', requestId)
+      .order('created_at', { ascending: true });
+    if (error || !data) {
+      setMessages([]);
+      return;
+    }
+    const parsed: ChatMessage[] = data.map((m: any) => {
+      const senderProfile = profilesMap[m.sender_id];
+      return {
+        id: m.id,
+        senderId: m.sender_id,
+        senderName: senderProfile?.fullName || 'User',
+        text: m.body,
+        timestamp: m.created_at,
+      };
+    });
+    setMessages(parsed);
+  }, [profilesMap]);
+
+  // Send a message
+  const sendMessage = useCallback(async (requestId: string, receiverId: string, text: string): Promise<{ error: string | null }> => {
+    if (!user) return { error: 'Not logged in.' };
+    const { error } = await supabase.from('messages').insert({
+      request_id: requestId,
+      sender_id: user.id,
+      receiver_id: receiverId,
+      body: text,
+    });
+    if (error) {
+      if (import.meta.env.DEV) console.error('[sendMessage] error:', error.message);
+      return { error: 'Failed to send message.' };
+    }
+    return { error: null };
+  }, [user]);
+
+  // Upload avatar
+  const updateAvatar = useCallback(async (file: File): Promise<{ error: string | null }> => {
+    if (!user) return { error: 'Not logged in.' };
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+    const { error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(fileName, file);
+    if (uploadError) {
+      if (import.meta.env.DEV) console.error('[updateAvatar] upload error:', uploadError.message);
+      return { error: 'Failed to upload image.' };
+    }
+    const { data: urlData } = supabase.storage
+      .from('avatars')
+      .getPublicUrl(fileName);
+    const publicUrl = urlData?.publicUrl;
+    if (!publicUrl) return { error: 'Failed to get image URL.' };
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({ avatar_url: publicUrl })
+      .eq('id', user.id);
+    if (updateError) {
+      return { error: 'Failed to update profile.' };
+    }
+    setUser({ ...user, avatarUrl: publicUrl });
+    setProfilesMap((prev) => ({
+      ...prev,
+      [user.id]: { ...prev[user.id], avatarUrl: publicUrl },
+    }));
+    return { error: null };
+  }, [user]);
+
+  // Remove avatar
+  const removeAvatar = useCallback(async (): Promise<{ error: string | null }> => {
+    if (!user || !user.avatarUrl) return { error: null };
+    try {
+      const url = new URL(user.avatarUrl);
+      const pathMatch = url.pathname.match(/avatars\/(.+)$/);
+      if (pathMatch) {
+        await supabase.storage.from('avatars').remove([pathMatch[1]]);
+      }
+    } catch {
+      // ignore storage cleanup errors
+    }
+    const { error } = await supabase
+      .from('profiles')
+      .update({ avatar_url: null })
+      .eq('id', user.id);
+    if (error) return { error: 'Failed to remove image.' };
+    setUser({ ...user, avatarUrl: null });
+    setProfilesMap((prev) => ({
+      ...prev,
+      [user.id]: { ...prev[user.id], avatarUrl: null },
+    }));
+    return { error: null };
+  }, [user]);
 
   // Auth state + initial data loading
   useEffect(() => {
@@ -284,13 +437,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setItems([]);
         setRequests([]);
         setProfilesMap({});
+        setNotifications([]);
+        setMessages([]);
+        setActiveChatRequestId(null);
         setAuthLoading(false);
       } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         (async () => {
           let profile = await fetchUserProfile(session.user.id);
           if (!profile) {
-            // Fallback: build profile from auth metadata if the profiles row
-            // doesn't exist yet (trigger delay or failure)
             const fallbackName =
               (session.user.user_metadata?.full_name as string) ||
               session.user.email?.split('@')[0] ||
@@ -301,11 +455,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
               email: session.user.email || '',
               studentId: (session.user.user_metadata?.student_id as string) || '',
               college: (session.user.user_metadata?.college as string) || '',
+              avatarUrl: null,
             };
           }
           if (!mounted) return;
           setUser(profile);
           fetchRequests(session.user.id);
+          fetchNotifications();
+          // Complete expired rentals on login
+          supabase.rpc('complete_expired_rentals').then(() => {
+            fetchListings();
+          });
           setAuthLoading(false);
         })();
       }
@@ -329,11 +489,43 @@ export function AppProvider({ children }: { children: ReactNode }) {
       })
       .subscribe();
 
+    // Subscribe to realtime notifications changes
+    const notificationsChannel = supabase
+      .channel('notifications-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, () => {
+        fetchNotifications();
+      })
+      .subscribe();
+
+    // Subscribe to realtime messages changes
+    const messagesChannel = supabase
+      .channel('messages-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
+        if (activeChatRequestId) {
+          fetchMessages(activeChatRequestId);
+        }
+      })
+      .subscribe();
+
+    // Periodically check for expired rentals (every 60 seconds)
+    const expiredInterval = setInterval(() => {
+      supabase.rpc('complete_expired_rentals').then(() => {
+        fetchListings();
+        if (sessionRef.current?.user?.id) {
+          fetchRequests(sessionRef.current.user.id);
+          fetchNotifications();
+        }
+      });
+    }, 60000);
+
     return () => {
       mounted = false;
       subscription.unsubscribe();
       supabase.removeChannel(listingsChannel);
       supabase.removeChannel(requestsChannel);
+      supabase.removeChannel(notificationsChannel);
+      supabase.removeChannel(messagesChannel);
+      clearInterval(expiredInterval);
     };
   }, []);
 
@@ -341,24 +533,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (user) {
       fetchListings();
+      fetchNotifications();
     }
   }, [user?.id]);
 
   async function fetchUserProfile(userId: string): Promise<UserProfile | null> {
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, full_name, email, student_id, college')
+      .select('id, full_name, email, student_id, college, avatar_url')
       .eq('id', userId)
       .maybeSingle();
 
     if (error || !data) return null;
-    return {
-      id: data.id,
-      fullName: data.full_name,
-      email: data.email,
-      studentId: data.student_id || '',
-      college: data.college || '',
-    };
+    return parseProfile(data);
   }
 
   const signup = useCallback(async (
@@ -390,12 +577,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return { error: error.message };
       }
 
-      // If user exists but no session, email confirmation is required
       if (data.user && !data.session) {
         return { error: null, needsEmailConfirmation: true };
       }
 
-      // If we have a session, update profile with student_id and college
       if (data.user) {
         await supabase
           .from('profiles')
@@ -430,12 +615,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
 
       if (data.user) {
-        // Try to fetch the profile; if it doesn't exist yet, create a fallback
-        // profile from auth user metadata so login always succeeds
         let profile = await fetchUserProfile(data.user.id);
         if (!profile) {
-          // Profile row may not exist yet (trigger delay or failure).
-          // Build a profile from the auth user's metadata so the user isn't stuck.
           const fallbackName =
             (data.user.user_metadata?.full_name as string) ||
             data.user.email?.split('@')[0] ||
@@ -446,10 +627,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
             email: data.user.email || normalizedEmail,
             studentId: (data.user.user_metadata?.student_id as string) || '',
             college: (data.user.user_metadata?.college as string) || '',
+            avatarUrl: null,
           };
         }
         setUser(profile);
         fetchRequests(data.user.id);
+        fetchNotifications();
       }
 
       return { error: null };
@@ -469,28 +652,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setRequests([]);
     setProfilesMap({});
     setSelectedItemId(null);
+    setNotifications([]);
+    setMessages([]);
+    setActiveChatRequestId(null);
   }, []);
 
   const deleteAccount = useCallback(async (): Promise<{ error: string | null }> => {
     if (!user) return { error: 'Not logged in.' };
     const userId = user.id;
 
-    // Delete the user's listings (will cascade to rent_requests)
     await supabase.from('listings').delete().eq('owner_id', userId);
-
-    // Delete requests where user is requester
     await supabase.from('rent_requests').delete().eq('requester_id', userId);
-
-    // Delete profile
     await supabase.from('profiles').delete().eq('id', userId);
 
-    // Sign out
     await supabase.auth.signOut();
     setUser(null);
     setItems([]);
     setRequests([]);
     setProfilesMap({});
     setSelectedItemId(null);
+    setNotifications([]);
+    setMessages([]);
+    setActiveChatRequestId(null);
 
     return { error: null };
   }, [user]);
@@ -508,7 +691,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     let imageUrl = PLACEHOLDER_IMAGES[data.category];
 
-    // Upload image to Supabase Storage if provided
     if (data.imageFile) {
       const fileExt = data.imageFile.name.split('.').pop();
       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
@@ -545,7 +727,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return { error: `Failed to create listing: ${insertError.message}` };
     }
 
-    // Realtime will handle the update, but also refresh manually
     fetchListings();
 
     return { error: null };
@@ -554,7 +735,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const deleteListing = useCallback(async (itemId: string): Promise<{ success: boolean; message?: string }> => {
     if (!user) return { success: false, message: 'Not logged in.' };
 
-    // Check for active/pending requests
     const { data: activeReqs } = await supabase
       .from('rent_requests')
       .select('id, status')
@@ -568,21 +748,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
       };
     }
 
-    // Get the listing to find image path for storage cleanup
     const { data: listing } = await supabase
       .from('listings')
       .select('image_url')
       .eq('id', itemId)
       .maybeSingle();
 
-    // Delete from database
     const { error } = await supabase.from('listings').delete().eq('id', itemId);
 
     if (error) {
       return { success: false, message: `Failed to delete: ${error.message}` };
     }
 
-    // Try to delete image from storage if it's our bucket
     if (listing?.image_url && listing.image_url.includes('listing-images')) {
       try {
         const url = new URL(listing.image_url);
@@ -609,7 +786,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }): Promise<{ error: string | null }> => {
     if (!user) return { error: 'Not logged in.' };
 
-    // Check item availability before creating the request
     const { data: listing, error: fetchError } = await supabase
       .from('listings')
       .select('availability, status')
@@ -646,10 +822,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const updateRequestStatus = useCallback(async (id: string, status: RequestStatus): Promise<{ error: string | null }> => {
     if (!user) return { error: 'Not logged in.' };
 
-    // Fetch the request to get listing_id
+    // For accept, use the atomic RPC to prevent race conditions
+    if (status === 'accepted') {
+      const { data, error } = await supabase.rpc('accept_rental', { p_request_id: id });
+      if (error) {
+        if (import.meta.env.DEV) console.error('[accept_rental] error:', error.message);
+        return { error: 'Failed to accept request.' };
+      }
+      if (data && data.error) {
+        return { error: data.error as string };
+      }
+      fetchRequests(user.id);
+      fetchListings();
+      fetchNotifications();
+      return { error: null };
+    }
+
+    // For reject, verify ownership and update
     const { data: req, error: fetchErr } = await supabase
       .from('rent_requests')
-      .select('id, listing_id, status')
+      .select('id, listing_id, status, owner_id')
       .eq('id', id)
       .maybeSingle();
 
@@ -657,20 +849,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return { error: 'Request not found.' };
     }
 
-    // If accepting, check the item is still available (prevent double rental)
-    if (status === 'accepted') {
-      const { data: listing } = await supabase
-        .from('listings')
-        .select('availability')
-        .eq('id', req.listing_id)
-        .maybeSingle();
-
-      if (listing?.availability !== 'available') {
-        return { error: 'This item is currently unavailable.' };
-      }
+    if (req.owner_id !== user.id) {
+      return { error: 'Only the item owner can reject requests.' };
     }
 
-    // Update the request status
     const { error } = await supabase
       .from('rent_requests')
       .update({ status })
@@ -680,13 +862,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return { error: `Failed to update request: ${error.message}` };
     }
 
-    // Update listing availability based on the new status
-    if (status === 'accepted') {
-      await supabase
-        .from('listings')
-        .update({ availability: 'unavailable' })
-        .eq('id', req.listing_id);
-    } else if (status === 'completed' || status === 'rejected') {
+    // For reject, set listing back to available (in case it was held)
+    if (status === 'rejected') {
       await supabase
         .from('listings')
         .update({ availability: 'available' })
@@ -695,9 +872,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     fetchRequests(user.id);
     fetchListings();
+    fetchNotifications();
 
     return { error: null };
-  }, [user, fetchRequests, fetchListings]);
+  }, [user, fetchRequests, fetchListings, fetchNotifications]);
 
   const markReturned = useCallback(async (requestId: string): Promise<{ error: string | null }> => {
     if (!user) return { error: 'Not logged in.' };
@@ -729,7 +907,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return { error: `Failed to update: ${updateErr.message}` };
     }
 
-    // Set listing back to available
     await supabase
       .from('listings')
       .update({ availability: 'available' })
@@ -737,9 +914,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     fetchRequests(user.id);
     fetchListings();
+    fetchNotifications();
 
     return { error: null };
-  }, [user, fetchRequests, fetchListings]);
+  }, [user, fetchRequests, fetchListings, fetchNotifications]);
 
   return (
     <AppContext.Provider
@@ -761,6 +939,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
         selectedItemId,
         setSelectedItemId,
         profilesMap,
+        notifications,
+        unreadCount,
+        markNotificationRead,
+        markAllNotificationsRead,
+        fetchNotifications,
+        messages,
+        activeChatRequestId,
+        setActiveChatRequestId,
+        fetchMessages,
+        sendMessage,
+        updateAvatar,
+        removeAvatar,
       }}
     >
       {children}

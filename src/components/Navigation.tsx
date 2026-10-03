@@ -7,11 +7,11 @@ import {
   Leaf,
   LogOut,
   MessageCircle,
-  Recycle,
+  Bell,
 } from 'lucide-react';
 import { useApp } from '../store';
 
-export type Page = 'home' | 'explore' | 'rentals' | 'items' | 'messages' | 'sustainability' | 'profile';
+export type Page = 'home' | 'explore' | 'rentals' | 'items' | 'messages' | 'notifications' | 'profile';
 
 interface Props {
   current: Page;
@@ -24,12 +24,23 @@ const NAV_ITEMS: { page: Page; label: string; icon: typeof Home }[] = [
   { page: 'rentals', label: 'My Rentals', icon: CalendarCheck },
   { page: 'items', label: 'My Items', icon: Package },
   { page: 'messages', label: 'Messages', icon: MessageCircle },
-  { page: 'sustainability', label: 'Eco Impact', icon: Recycle },
+  { page: 'notifications', label: 'Alerts', icon: Bell },
   { page: 'profile', label: 'Profile', icon: User },
 ];
 
+function Avatar({ url, name, size = 'h-8 w-8 text-sm' }: { url: string | null; name: string; size?: string }) {
+  if (url) {
+    return <img src={url} alt={name} className={`${size} rounded-full object-cover`} />;
+  }
+  return (
+    <div className={`flex ${size} items-center justify-center rounded-full bg-emerald-100 font-bold text-emerald-700`}>
+      {name?.charAt(0).toUpperCase() || '?'}
+    </div>
+  );
+}
+
 export function Navigation({ current, navigate }: Props) {
-  const { user, logout } = useApp();
+  const { user, logout, unreadCount } = useApp();
 
   return (
     <>
@@ -56,7 +67,7 @@ export function Navigation({ current, navigate }: Props) {
                 <button
                   key={item.page}
                   onClick={() => navigate(item.page)}
-                  className={`flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium transition-all ${
+                  className={`relative flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium transition-all ${
                     active
                       ? 'bg-emerald-50 text-emerald-700'
                       : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
@@ -64,6 +75,11 @@ export function Navigation({ current, navigate }: Props) {
                 >
                   <Icon className="h-4 w-4" />
                   {item.label}
+                  {item.page === 'notifications' && unreadCount > 0 && (
+                    <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -71,9 +87,7 @@ export function Navigation({ current, navigate }: Props) {
 
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-sm font-bold text-emerald-700">
-                {user?.fullName.charAt(0).toUpperCase()}
-              </div>
+              <Avatar url={user?.avatarUrl ?? null} name={user?.fullName ?? ''} />
               <span className="text-sm font-medium text-gray-700">{user?.fullName}</span>
             </div>
             <button
@@ -101,12 +115,25 @@ export function Navigation({ current, navigate }: Props) {
               Campus<span className="text-emerald-600">Loop</span>
             </span>
           </button>
-          <button
-            onClick={logout}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
-          >
-            <LogOut className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate('notifications')}
+              className="relative flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-emerald-50 hover:text-emerald-600"
+            >
+              <Bell className="h-5 w-5" />
+              {unreadCount > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={logout}
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
+            >
+              <LogOut className="h-5 w-5" />
+            </button>
+          </div>
         </div>
       </header>
 
@@ -120,12 +147,17 @@ export function Navigation({ current, navigate }: Props) {
               <button
                 key={item.page}
                 onClick={() => navigate(item.page)}
-                className={`flex flex-1 flex-col items-center gap-0.5 rounded-lg py-1.5 transition-colors ${
+                className={`relative flex flex-1 flex-col items-center gap-0.5 rounded-lg py-1.5 transition-colors ${
                   active ? 'text-emerald-600' : 'text-gray-400'
                 }`}
               >
                 <Icon className={`h-5 w-5 ${active ? 'scale-110' : ''} transition-transform`} />
                 <span className="text-[10px] font-medium">{item.label}</span>
+                {item.page === 'notifications' && unreadCount > 0 && (
+                  <span className="absolute right-1 top-0 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
               </button>
             );
           })}

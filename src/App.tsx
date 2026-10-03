@@ -8,7 +8,7 @@ import { Explore } from './pages/Explore';
 import { MyRentals } from './pages/MyRentals';
 import { MyItems } from './pages/MyItems';
 import { Messages } from './pages/Messages';
-import { Sustainability } from './pages/Sustainability';
+import { Notifications } from './pages/Notifications';
 import { Profile } from './pages/Profile';
 
 function AppContent() {
@@ -40,9 +40,9 @@ function AppContent() {
         {page === 'home' && <Home navigate={navigate} />}
         {page === 'explore' && <Explore />}
         {page === 'rentals' && <MyRentals navigate={navigate} />}
-        {page === 'items' && <MyItems />}
+        {page === 'items' && <MyItems navigate={navigate} />}
         {page === 'messages' && <Messages navigate={navigate} />}
-        {page === 'sustainability' && <Sustainability navigate={navigate} />}
+        {page === 'notifications' && <Notifications navigate={navigate} />}
         {page === 'profile' && <Profile navigate={navigate} />}
       </main>
     </div>

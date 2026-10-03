@@ -14,14 +14,15 @@ import {
   Image as ImageIcon,
   Loader2,
   AlertCircle,
+  MessageCircle,
 } from 'lucide-react';
 import { useApp } from '../store';
 import { CATEGORIES, CONDITIONS } from '../data';
 import { ItemCard } from '../components/ItemCard';
 import type { Category, Condition } from '../types';
 
-export function MyItems() {
-  const { user, items, addListing, deleteListing, requests, updateRequestStatus, markReturned } = useApp();
+export function MyItems({ navigate }: { navigate: (p: import('../components/Navigation').Page) => void }) {
+  const { user, items, addListing, deleteListing, requests, updateRequestStatus, markReturned, setActiveChatRequestId } = useApp();
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState('');
   const [category, setCategory] = useState<Category>('Books');
@@ -427,19 +428,31 @@ export function MyItems() {
                     </div>
                   )}
                   {req.status === 'accepted' && (
-                    <button
-                      onClick={async () => {
-                        const result = await markReturned(req.id);
-                        if (result?.error) {
-                          setDeleteError(result.error);
-                          setTimeout(() => setDeleteError(null), 4000);
-                        }
-                      }}
-                      className="flex items-center gap-1.5 rounded-lg bg-teal-600 px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-teal-700"
-                    >
-                      <Check className="h-3.5 w-3.5" />
-                      Mark Returned
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setActiveChatRequestId(req.id);
+                          navigate('messages');
+                        }}
+                        className="flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3.5 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
+                      >
+                        <MessageCircle className="h-3.5 w-3.5" />
+                        Chat
+                      </button>
+                      <button
+                        onClick={async () => {
+                          const result = await markReturned(req.id);
+                          if (result?.error) {
+                            setDeleteError(result.error);
+                            setTimeout(() => setDeleteError(null), 4000);
+                          }
+                        }}
+                        className="flex items-center gap-1.5 rounded-lg bg-teal-600 px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-teal-700"
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                        Mark Returned
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
