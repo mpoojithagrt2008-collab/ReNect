@@ -18,11 +18,11 @@ function AppContent() {
 
   if (authLoading) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50">
-        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-200">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-lavender-50 via-white to-babyblue-50">
+        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-lavender-400 to-lavender-600 shadow-soft-lg">
           <Leaf className="h-8 w-8 text-white" />
         </div>
-        <div className="flex items-center gap-2 text-gray-500">
+        <div className="flex items-center gap-2 text-gray-400">
           <Loader2 className="h-5 w-5 animate-spin" />
           <span className="text-sm font-medium">Loading ReNect...</span>
         </div>
@@ -35,9 +35,9 @@ function AppContent() {
   const navigate = (p: Page) => setPage(p);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen">
       <Navigation current={page} navigate={navigate} />
-      <main className="pb-20 md:pb-0">
+      <main className="pb-24 md:pb-0">
         {page === 'home' && <Home navigate={navigate} />}
         {page === 'explore' && <Explore />}
         {page === 'rentals' && <MyRentals navigate={navigate} />}

@@ -1,27 +1,12 @@
 import { useState, useEffect } from 'react';
 import {
-  ArrowLeft,
-  MapPin,
-  User,
-  Tag,
-  Calendar,
-  MessageSquare,
-  Send,
-  CheckCircle2,
-  Loader2,
-  AlertCircle,
-  Trash2,
-  XCircle,
-  Heart,
+  ArrowLeft, MapPin, User, Tag, Calendar, MessageSquare, Send, CheckCircle2, Loader2, AlertCircle, Trash2, XCircle, Heart,
 } from 'lucide-react';
 import type { Item } from '../types';
 import { useApp } from '../store';
 import { VerifiedBadge, ConditionBadge, formatPrice, StarRatingDisplay, formatOwnerName } from '../components/ui';
 
-interface Props {
-  item: Item;
-  onBack: () => void;
-}
+interface Props { item: Item; onBack: () => void; }
 
 export function ItemDetails({ item, onBack }: Props) {
   const { user, addRequest, deleteListing, favoriteIds, toggleFavorite, ratingsMap, fetchRating, reviews, fetchReviews } = useApp();
@@ -41,38 +26,27 @@ export function ItemDetails({ item, onBack }: Props) {
   const isFavorite = favoriteIds.has(item.id);
   const rating = ratingsMap[item.id];
 
-  // Calculate rental duration and total
   const rentalDuration = (() => {
     if (!startDate || !endDate) return 0;
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+    const start = new Date(startDate); const end = new Date(endDate);
     const diffMs = end.getTime() - start.getTime();
     if (diffMs <= 0) return 0;
-    if (item.pricingType === 'hour') {
-      return Math.round(diffMs / (1000 * 60 * 60));
-    }
+    if (item.pricingType === 'hour') return Math.round(diffMs / (1000 * 60 * 60));
     return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
   })();
   const rentalTotal = rentalDuration > 0 ? rentalDuration * item.pricePerDay : 0;
 
-  // Fetch rating and reviews when item changes
-  useEffect(() => {
-    fetchRating(item.id);
-    fetchReviews(item.id);
-  }, [item.id]);
+  useEffect(() => { fetchRating(item.id); fetchReviews(item.id); }, [item.id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setSubmitting(true);
+    e.preventDefault(); setError(null); setSubmitting(true);
     const result = await addRequest({ listingId: item.id, ownerId: item.ownerId, startDate, endDate, message });
     setSubmitting(false);
     if (result.error) { setError(result.error); } else { setSubmitted(true); }
   };
 
   const handleDelete = async () => {
-    setDeleting(true);
-    setDeleteError(null);
+    setDeleting(true); setDeleteError(null);
     const result = await deleteListing(item.id);
     setDeleting(false);
     if (result.success) { setShowDeleteConfirm(false); onBack(); }
@@ -82,22 +56,18 @@ export function ItemDetails({ item, onBack }: Props) {
   if (submitted) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-8 md:py-12">
-        <button onClick={onBack} className="mb-6 flex items-center gap-1.5 text-sm font-medium text-gray-500 transition-colors hover:text-gray-900">
+        <button onClick={onBack} className="mb-6 flex items-center gap-1.5 text-sm font-medium text-gray-400 transition-colors hover:text-gray-700">
           <ArrowLeft className="h-4 w-4" /> Back to Explore
         </button>
-        <div className="flex flex-col items-center justify-center rounded-3xl border border-gray-200 bg-white p-8 text-center shadow-sm md:p-12">
-          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50">
-            <CheckCircle2 className="h-8 w-8 text-emerald-600" />
-          </div>
-          <h2 className="text-xl font-bold text-gray-900">Request Sent</h2>
+        <div className="flex flex-col items-center justify-center rounded-4xl border border-lavender-100 bg-white p-8 text-center shadow-card md:p-12">
+          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-mint-50"><CheckCircle2 className="h-8 w-8 text-mint-600" /></div>
+          <h2 className="text-xl font-bold text-gray-800">Request Sent</h2>
           <p className="mt-2 max-w-sm text-sm text-gray-500">
             Your request to borrow <span className="font-semibold text-gray-700">{item.name}</span> from{' '}
             <span className="font-semibold text-gray-700">{formatOwnerName(item.ownerName, item.ownerStudentId)}</span> has been sent. You'll be notified once they respond.
           </p>
           <div className="mt-6 flex gap-3">
-            <button onClick={onBack} className="rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50">
-              Continue Exploring
-            </button>
+            <button onClick={onBack} className="rounded-2xl border border-lavender-100 bg-white px-5 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-lavender-50">Continue Exploring</button>
           </div>
         </div>
       </div>
@@ -106,21 +76,18 @@ export function ItemDetails({ item, onBack }: Props) {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 md:px-6 md:py-8">
-      <button onClick={onBack} className="mb-5 flex items-center gap-1.5 text-sm font-medium text-gray-500 transition-colors hover:text-gray-900">
+      <button onClick={onBack} className="mb-5 flex items-center gap-1.5 text-sm font-medium text-gray-400 transition-colors hover:text-gray-700">
         <ArrowLeft className="h-4 w-4" /> Back
       </button>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <div className="relative overflow-hidden rounded-2xl border border-gray-200 bg-gray-100">
+        <div className="relative overflow-hidden rounded-3xl border border-lavender-100 bg-lavender-50">
           <img src={item.image} alt={item.name} className="aspect-[4/3] w-full object-cover" />
-          <div className={`absolute right-3 top-3 rounded-full px-3 py-1 text-xs font-bold text-white shadow-sm ${isAvailable ? 'bg-emerald-500' : 'bg-gray-500'}`}>
+          <div className={`absolute right-3 top-3 rounded-full px-3 py-1 text-xs font-bold text-white shadow-soft ${isAvailable ? 'bg-mint-500' : 'bg-gray-500'}`}>
             {isAvailable ? 'Available' : 'Unavailable'}
           </div>
           {!isOwnItem && (
-            <button
-              onClick={() => toggleFavorite(item.id)}
-              className="absolute left-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 shadow-sm transition-all hover:bg-white"
-            >
+            <button onClick={() => toggleFavorite(item.id)} className="absolute left-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 shadow-soft transition-all hover:bg-white">
               <Heart className={`h-5 w-5 transition-colors ${isFavorite ? 'fill-red-500 text-red-500' : 'text-gray-400 hover:text-red-500'}`} />
             </button>
           )}
@@ -132,43 +99,40 @@ export function ItemDetails({ item, onBack }: Props) {
               <ConditionBadge condition={item.condition} />
               <span className="text-xs text-gray-400">{item.category}</span>
             </div>
-            <h1 className="text-xl font-bold tracking-tight text-gray-900 md:text-2xl">{item.name}</h1>
+            <h1 className="text-xl font-bold tracking-tight text-gray-800 md:text-2xl">{item.name}</h1>
             {rating && rating.reviewCount > 0 && (
-              <div className="mt-2">
-                <StarRatingDisplay rating={rating.averageRating} count={rating.reviewCount} />
-              </div>
+              <div className="mt-2"><StarRatingDisplay rating={rating.averageRating} count={rating.reviewCount} /></div>
             )}
           </div>
 
-          <div className="rounded-xl bg-emerald-50 px-4 py-3">
-            <span className="text-2xl font-bold text-emerald-600">{formatPrice(item.pricePerDay, item.pricingType)}</span>
+          <div className="rounded-2xl bg-lavender-50 px-4 py-3">
+            <span className="text-2xl font-bold text-lavender-600">{formatPrice(item.pricePerDay, item.pricingType)}</span>
           </div>
 
           <p className="text-sm leading-relaxed text-gray-600">{item.description}</p>
 
-          <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-4">
+          <div className="space-y-3 rounded-2xl border border-lavender-100 bg-white p-4 shadow-card">
             <div className="flex items-center gap-3 text-sm">
-              <MapPin className="h-4.5 w-4.5 text-gray-400" />
-              <span className="text-gray-500">Location</span>
-              <span className="ml-auto font-medium text-gray-900">{item.location}</span>
+              <MapPin className="h-4.5 w-4.5 text-lavender-400" />
+              <span className="text-gray-400">Location</span>
+              <span className="ml-auto font-medium text-gray-800">{item.location}</span>
             </div>
             <div className="flex items-center gap-3 text-sm">
-              <Tag className="h-4.5 w-4.5 text-gray-400" />
-              <span className="text-gray-500">Condition</span>
-              <span className="ml-auto font-medium text-gray-900">{item.condition}</span>
+              <Tag className="h-4.5 w-4.5 text-lavender-400" />
+              <span className="text-gray-400">Condition</span>
+              <span className="ml-auto font-medium text-gray-800">{item.condition}</span>
             </div>
             <div className="flex items-center gap-3 text-sm">
-              <User className="h-4.5 w-4.5 text-gray-400" />
-              <span className="text-gray-500">Owner</span>
-              <span className="ml-auto flex items-center gap-1.5 font-medium text-gray-900">
-                {formatOwnerName(item.ownerName, item.ownerStudentId)}
-                <VerifiedBadge verified={item.verified} />
+              <User className="h-4.5 w-4.5 text-lavender-400" />
+              <span className="text-gray-400">Owner</span>
+              <span className="ml-auto flex items-center gap-1.5 font-medium text-gray-800">
+                {formatOwnerName(item.ownerName, item.ownerStudentId)} <VerifiedBadge verified={item.verified} />
               </span>
             </div>
           </div>
 
           {error && (
-            <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+            <div className="flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
               <p className="text-xs text-red-600">{error}</p>
             </div>
@@ -176,78 +140,74 @@ export function ItemDetails({ item, onBack }: Props) {
 
           {isOwnItem ? (
             <>
-              <div className={`rounded-xl border px-4 py-3 text-center text-sm font-medium ${isAvailable ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-gray-200 bg-gray-50 text-gray-600'}`}>
+              <div className={`rounded-2xl border px-4 py-3 text-center text-sm font-medium ${isAvailable ? 'border-mint-200 bg-mint-50 text-mint-700' : 'border-gray-200 bg-gray-50 text-gray-600'}`}>
                 {isAvailable ? 'This item is available for rent' : 'This item is currently rented out'}
               </div>
-              <button onClick={() => setShowDeleteConfirm(true)} disabled={deleting} className="flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 py-2.5 text-sm font-semibold text-red-600 transition-colors hover:bg-red-100 disabled:opacity-60">
+              <button onClick={() => setShowDeleteConfirm(true)} disabled={deleting}
+                className="flex items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-50 py-2.5 text-sm font-semibold text-red-600 transition-colors hover:bg-red-100 disabled:opacity-60">
                 <Trash2 className="h-4 w-4" /> Delete Listing
               </button>
             </>
           ) : !isAvailable ? (
-            <div className="flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-500">
+            <div className="flex items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-400">
               <XCircle className="h-4 w-4 text-gray-400" /> This item is currently unavailable
             </div>
           ) : showRequestForm ? (
-            <form onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-gray-200 bg-white p-4">
-              <h3 className="text-sm font-semibold text-gray-900">Request to Borrow</h3>
+            <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-lavender-100 bg-white p-4 shadow-card">
+              <h3 className="text-sm font-semibold text-gray-800">Request to Borrow</h3>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-gray-600">Start Date</label>
+                  <label className="mb-1.5 block text-xs font-medium text-gray-500">Start Date</label>
                   <div className="relative">
-                    <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                    <input type="date" required value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-2 text-sm text-gray-900 outline-none focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100" />
+                    <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-lavender-400" />
+                    <input type="date" required value={startDate} onChange={(e) => setStartDate(e.target.value)}
+                      className="w-full rounded-xl border border-lavender-100 bg-lavender-50/40 py-2 pl-9 pr-2 text-sm text-gray-800 outline-none focus:border-lavender-400 focus:bg-white focus:ring-2 focus:ring-lavender-100" />
                   </div>
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-gray-600">End Date</label>
+                  <label className="mb-1.5 block text-xs font-medium text-gray-500">End Date</label>
                   <div className="relative">
-                    <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                    <input type="date" required value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-2 text-sm text-gray-900 outline-none focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100" />
+                    <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-lavender-400" />
+                    <input type="date" required value={endDate} onChange={(e) => setEndDate(e.target.value)}
+                      className="w-full rounded-xl border border-lavender-100 bg-lavender-50/40 py-2 pl-9 pr-2 text-sm text-gray-800 outline-none focus:border-lavender-400 focus:bg-white focus:ring-2 focus:ring-lavender-100" />
                   </div>
                 </div>
               </div>
 
-              {/* Pricing summary */}
               {rentalDuration > 0 && (
-                <div className="rounded-lg bg-emerald-50 px-3 py-2.5 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600">Rate</span>
-                    <span className="font-medium text-gray-900">₹{item.pricePerDay}/{item.pricingType === 'hour' ? 'hour' : 'day'}</span>
-                  </div>
-                  <div className="mt-1 flex items-center justify-between">
-                    <span className="text-gray-600">Duration</span>
-                    <span className="font-medium text-gray-900">{rentalDuration} {item.pricingType === 'hour' ? 'hour' + (rentalDuration !== 1 ? 's' : '') : 'day' + (rentalDuration !== 1 ? 's' : '')}</span>
-                  </div>
-                  <div className="mt-1.5 flex items-center justify-between border-t border-emerald-200 pt-1.5">
-                    <span className="font-semibold text-gray-700">Total</span>
-                    <span className="text-base font-bold text-emerald-600">₹{rentalTotal}</span>
-                  </div>
+                <div className="rounded-xl bg-lavender-50 px-3 py-2.5 text-xs">
+                  <div className="flex items-center justify-between"><span className="text-gray-500">Rate</span><span className="font-medium text-gray-800">₹{item.pricePerDay}/{item.pricingType === 'hour' ? 'hour' : 'day'}</span></div>
+                  <div className="mt-1 flex items-center justify-between"><span className="text-gray-500">Duration</span><span className="font-medium text-gray-800">{rentalDuration} {item.pricingType === 'hour' ? 'hour' + (rentalDuration !== 1 ? 's' : '') : 'day' + (rentalDuration !== 1 ? 's' : '')}</span></div>
+                  <div className="mt-1.5 flex items-center justify-between border-t border-lavender-200 pt-1.5"><span className="font-semibold text-gray-700">Total</span><span className="text-base font-bold text-lavender-600">₹{rentalTotal}</span></div>
                 </div>
               )}
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-gray-600">Message to owner</label>
+                <label className="mb-1.5 block text-xs font-medium text-gray-500">Message to owner</label>
                 <div className="relative">
-                  <MessageSquare className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={3} placeholder="Hi! I'd like to borrow this for..." className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-3 text-sm text-gray-900 outline-none focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100" />
+                  <MessageSquare className="absolute left-3 top-3 h-4 w-4 text-lavender-400" />
+                  <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={3} placeholder="Hi! I'd like to borrow this for..."
+                    className="w-full rounded-xl border border-lavender-100 bg-lavender-50/40 py-2 pl-9 pr-3 text-sm text-gray-800 outline-none focus:border-lavender-400 focus:bg-white focus:ring-2 focus:ring-lavender-100" />
                 </div>
               </div>
-              <button type="submit" disabled={submitting} className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white shadow-md shadow-emerald-200 transition-all hover:bg-emerald-700 active:scale-[0.98] disabled:opacity-60">
+              <button type="submit" disabled={submitting}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-lavender-500 to-lavender-600 py-2.5 text-sm font-semibold text-white shadow-soft-lg transition-all hover:shadow-lg active:scale-[0.98] disabled:opacity-50">
                 {submitting ? (<><Loader2 className="h-4 w-4 animate-spin" /> Sending request...</>) : (<><Send className="h-4 w-4" /> Submit Request</>)}
               </button>
             </form>
           ) : (
-            <button onClick={() => setShowRequestForm(true)} className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white shadow-md shadow-emerald-200 transition-all hover:bg-emerald-700 active:scale-[0.98]">
+            <button onClick={() => setShowRequestForm(true)}
+              className="flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-lavender-500 to-lavender-600 py-3 text-sm font-semibold text-white shadow-soft-lg transition-all hover:shadow-lg active:scale-[0.98]">
               Request to Borrow
             </button>
           )}
 
           {/* Reviews section */}
           {reviews.length > 0 && (
-            <div className="rounded-xl border border-gray-200 bg-white p-4">
-              <h3 className="mb-3 text-sm font-semibold text-gray-900">Reviews ({reviews.length})</h3>
+            <div className="rounded-2xl border border-lavender-100 bg-white p-4 shadow-card">
+              <h3 className="mb-3 text-sm font-semibold text-gray-800">Reviews ({reviews.length})</h3>
               <div className="space-y-3">
                 {reviews.map((review) => (
-                  <div key={review.id} className="border-b border-gray-100 pb-3 last:border-0 last:pb-0">
+                  <div key={review.id} className="border-b border-lavender-100 pb-3 last:border-0 last:pb-0">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-medium text-gray-700">{review.reviewerName}</span>
                       <div className="flex items-center">
@@ -268,26 +228,26 @@ export function ItemDetails({ item, onBack }: Props) {
       </div>
 
       {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+          <div className="w-full max-w-sm rounded-4xl bg-white p-6 shadow-soft-lg">
             {deleteError && (
-              <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+              <div className="mb-4 flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
                 <p className="text-xs text-red-600">{deleteError}</p>
               </div>
             )}
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-red-50">
-              <Trash2 className="h-6 w-6 text-red-500" />
-            </div>
-            <h2 className="text-lg font-bold text-gray-900">Delete this item?</h2>
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50"><Trash2 className="h-6 w-6 text-red-500" /></div>
+            <h2 className="text-lg font-bold text-gray-800">Delete this item?</h2>
             <p className="mt-2 text-sm text-gray-500">
               Are you sure you want to permanently delete <span className="font-semibold text-gray-700">{item.name}</span>? This action cannot be undone.
             </p>
             <div className="mt-6 flex gap-3">
-              <button onClick={handleDelete} disabled={deleting} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-600 py-2.5 text-sm font-semibold text-white shadow-md shadow-red-200 transition-all hover:bg-red-700 active:scale-[0.98] disabled:opacity-60">
+              <button onClick={handleDelete} disabled={deleting}
+                className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-red-600 py-2.5 text-sm font-semibold text-white transition-all hover:bg-red-700 active:scale-[0.98] disabled:opacity-50">
                 {deleting ? (<><Loader2 className="h-4 w-4 animate-spin" /> Deleting...</>) : 'Yes, Delete'}
               </button>
-              <button onClick={() => setShowDeleteConfirm(false)} disabled={deleting} className="rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-60">
+              <button onClick={() => setShowDeleteConfirm(false)} disabled={deleting}
+                className="rounded-2xl border border-lavender-100 bg-white px-5 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-lavender-50 disabled:opacity-50">
                 Cancel
               </button>
             </div>

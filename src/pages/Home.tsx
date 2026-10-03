@@ -8,7 +8,6 @@ import {
   Package,
   Repeat,
   Clock,
-  Loader2,
   Heart,
 } from 'lucide-react';
 import { useApp } from '../store';
@@ -42,21 +41,8 @@ const CATEGORY_GRADIENTS: Record<string, string> = {
 };
 
 export function Home({ navigate }: Props) {
-  const { user, exploreItems, items, itemsLoading, setSelectedItemId, favoriteIds, toggleFavorite, ratingsMap } = useApp();
+  const { user, exploreItems, setSelectedItemId, favoriteIds, toggleFavorite, ratingsMap } = useApp();
   const [search, setSearch] = useState('');
-
-  const recommended = useMemo(() => {
-    const userCats = items
-      .filter((i) => i.ownerId === user?.id)
-      .map((i) => i.category);
-    const scored = exploreItems
-      .map((i) => ({
-        item: i,
-        score: (userCats.includes(i.category) ? 2 : 0) + (i.condition === 'Like New' || i.condition === 'New' ? 1 : 0),
-      }))
-      .sort((a, b) => b.score - a.score);
-    return scored.slice(0, 4).map((s) => s.item);
-  }, [exploreItems, items]);
 
   const recentlyAdded = useMemo(() => exploreItems.slice(0, 4), [exploreItems]);
 
@@ -200,38 +186,6 @@ export function Home({ navigate }: Props) {
           </button>
         ))}
       </div>
-
-      {/* Recommended items */}
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h2 className="flex items-center gap-2 text-base font-semibold text-gray-800">
-            <Sparkles className="h-4.5 w-4.5 text-lavender-500" />
-            Recommended for you
-          </h2>
-          <p className="mt-0.5 text-xs text-gray-400">Based on your listings and popular items</p>
-        </div>
-        <button
-          onClick={() => navigate('explore')}
-          className="shrink-0 rounded-full bg-lavender-50 px-3 py-1.5 text-sm font-medium text-lavender-600 transition-colors hover:bg-lavender-100"
-        >
-          View all →
-        </button>
-      </div>
-      {itemsLoading ? (
-        <div className="mb-8 flex items-center justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-lavender-500" />
-        </div>
-      ) : recommended.length > 0 ? (
-        <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-          {recommended.map((item) => (
-            <ItemCard key={item.id} item={item} onClick={() => handleItemClick(item.id)} isFavorite={favoriteIds.has(item.id)} onToggleFavorite={() => toggleFavorite(item.id)} rating={ratingsMap[item.id] || null} />
-          ))}
-        </div>
-      ) : (
-        <div className="mb-8 rounded-3xl border border-dashed border-lavender-200 bg-white py-12 text-center">
-          <p className="text-sm text-gray-400">No items available yet. Be the first to list one!</p>
-        </div>
-      )}
 
       {/* Recently added items */}
       <div className="mb-4 flex items-center justify-between">

@@ -9,7 +9,7 @@ interface Props {
 }
 
 export function Favorites({ navigate }: Props) {
-  const { items, favorites, favoriteIds, toggleFavorite, ratingsMap, itemsLoading, setSelectedItemId } = useApp();
+  const { items, favorites, toggleFavorite, ratingsMap, itemsLoading, setSelectedItemId } = useApp();
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -23,20 +23,22 @@ export function Favorites({ navigate }: Props) {
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 md:px-6 md:py-8">
       <div className="mb-6 flex items-center gap-2">
-        <Heart className="h-6 w-6 text-red-500" />
+        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-red-50">
+          <Heart className="h-5 w-5 text-red-500" />
+        </div>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900">Favorites</h1>
-          <p className="text-sm text-gray-500">Items you've saved for later</p>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-800">Favorites</h1>
+          <p className="text-sm text-gray-400">Items you've saved for later</p>
         </div>
       </div>
 
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
+          <Loader2 className="h-8 w-8 animate-spin text-lavender-500" />
         </div>
       ) : favoriteItems.length > 0 ? (
         <>
-          <div className="mb-3 text-sm text-gray-500">
+          <div className="mb-3 text-sm text-gray-400">
             {favoriteItems.length} {favoriteItems.length === 1 ? 'item' : 'items'}
           </div>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
@@ -53,17 +55,17 @@ export function Favorites({ navigate }: Props) {
           </div>
         </>
       ) : (
-        <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-gray-300 bg-white py-16 text-center">
+        <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-lavender-200 bg-white py-16 text-center">
           <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-50">
             <Heart className="h-8 w-8 text-red-400" />
           </div>
-          <h3 className="text-base font-semibold text-gray-900">No favorites yet</h3>
-          <p className="mt-1 max-w-xs text-sm text-gray-500">
+          <h3 className="text-base font-semibold text-gray-800">No favorites yet</h3>
+          <p className="mt-1 max-w-xs text-sm text-gray-400">
             Tap the heart icon on any item to save it here for later.
           </p>
           <button
             onClick={() => navigate('explore')}
-            className="mt-5 flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-emerald-200 transition-all hover:bg-emerald-700"
+            className="mt-5 flex items-center gap-2 rounded-2xl bg-gradient-to-r from-lavender-500 to-lavender-600 px-5 py-2.5 text-sm font-semibold text-white shadow-soft-lg transition-all hover:shadow-lg"
           >
             <Package className="h-4 w-4" />
             Explore Items

@@ -3,13 +3,10 @@ import {
   Compass,
   CalendarCheck,
   Package,
-  User,
   Leaf,
   LogOut,
-  MessageCircle,
   Bell,
   Heart,
-  Plus,
 } from 'lucide-react';
 import { useApp } from '../store';
 
@@ -20,31 +17,17 @@ interface Props {
   navigate: (p: Page) => void;
 }
 
-const NAV_ITEMS: { page: Page; label: string; icon: typeof HomeIcon }[] = [
+const BOTTOM_NAV: { page: Page; label: string; icon: typeof HomeIcon }[] = [
   { page: 'home', label: 'Home', icon: HomeIcon },
   { page: 'explore', label: 'Explore', icon: Compass },
   { page: 'rentals', label: 'Rentals', icon: CalendarCheck },
   { page: 'items', label: 'My Items', icon: Package },
-  { page: 'messages', label: 'Messages', icon: MessageCircle },
-  { page: 'favorites', label: 'Favorites', icon: Heart },
-  { page: 'notifications', label: 'Alerts', icon: Bell },
-  { page: 'profile', label: 'Profile', icon: User },
 ];
 
-const BOTTOM_NAV: { page: Page; label: string; icon: typeof HomeIcon }[] = [
-  { page: 'home', label: 'Home', icon: HomeIcon },
-  { page: 'explore', label: 'Explore', icon: Compass },
-  { page: 'items', label: 'Add', icon: Plus },
-  { page: 'messages', label: 'Messages', icon: MessageCircle },
-  { page: 'profile', label: 'Profile', icon: User },
-];
-
-function Avatar({ url, name, size = 'h-8 w-8 text-sm' }: { url: string | null; name: string; size?: string }) {
-  if (url) {
-    return <img src={url} alt={name} className={`${size} rounded-full object-cover`} />;
-  }
+function MiniAvatar({ url, name }: { url: string | null; name: string }) {
+  if (url) return <img src={url} alt={name} className="h-8 w-8 rounded-full object-cover" />;
   return (
-    <div className={`flex ${size} items-center justify-center rounded-full bg-lavender-100 font-bold text-lavender-600`}>
+    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-lavender-100 font-bold text-xs text-lavender-600">
       {name?.charAt(0).toUpperCase() || '?'}
     </div>
   );
@@ -58,130 +41,67 @@ export function Navigation({ current, navigate }: Props) {
       {/* Desktop header */}
       <header className="sticky top-0 z-40 hidden border-b border-lavender-100 bg-white/70 backdrop-blur-xl md:block">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3.5">
-          <button
-            onClick={() => navigate('home')}
-            className="flex items-center gap-2 transition-transform hover:scale-105"
-          >
+          <button onClick={() => navigate('home')} className="flex items-center gap-2 transition-transform hover:scale-105">
             <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br from-lavender-400 to-lavender-600 shadow-soft">
               <Leaf className="h-5 w-5 text-white" />
             </div>
-            <span className="text-lg font-bold tracking-tight text-gray-800">
-              Re<span className="text-lavender-600">Nect</span>
-            </span>
+            <span className="text-lg font-bold tracking-tight text-gray-800">Re<span className="text-lavender-600">Nect</span></span>
           </button>
 
-          <nav className="flex items-center gap-1">
-            {NAV_ITEMS.map((item) => {
-              const Icon = item.icon;
-              const active = current === item.page;
-              return (
-                <button
-                  key={item.page}
-                  onClick={() => navigate(item.page)}
-                  className={`relative flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-medium transition-all ${
-                    active
-                      ? 'bg-lavender-100 text-lavender-700'
-                      : 'text-gray-500 hover:bg-lavender-50 hover:text-lavender-600'
-                  }`}
-                >
-                  <Icon className="h-4 w-4" />
-                  {item.label}
-                  {item.page === 'notifications' && unreadCount > 0 && (
-                    <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-babyblue-500 px-1 text-[10px] font-bold text-white">
-                      {unreadCount > 9 ? '9+' : unreadCount}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </nav>
-
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Avatar url={user?.avatarUrl ?? null} name={user?.fullName ?? ''} />
-              <span className="text-sm font-medium text-gray-700">{user?.fullName}</span>
-            </div>
-            <button
-              onClick={logout}
-              className="flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
-            >
-              <LogOut className="h-4 w-4" />
+          <div className="flex items-center gap-2">
+            <button onClick={() => navigate('favorites')} className={`flex h-9 w-9 items-center justify-center rounded-full transition-all ${current === 'favorites' ? 'bg-red-50 text-red-500' : 'text-gray-400 hover:bg-lavender-50 hover:text-lavender-600'}`}>
+              <Heart className="h-5 w-5" />
+            </button>
+            <button onClick={() => navigate('notifications')} className={`relative flex h-9 w-9 items-center justify-center rounded-full transition-all ${current === 'notifications' ? 'bg-lavender-100 text-lavender-600' : 'text-gray-400 hover:bg-lavender-50 hover:text-lavender-600'}`}>
+              <Bell className="h-5 w-5" />
+              {unreadCount > 0 && <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-babyblue-500 px-1 text-[10px] font-bold text-white">{unreadCount > 9 ? '9+' : unreadCount}</span>}
+            </button>
+            <button onClick={() => navigate('profile')} className={`flex items-center gap-1.5 rounded-full p-0.5 pr-2 transition-all ${current === 'profile' ? 'bg-lavender-100' : 'hover:bg-lavender-50'}`}>
+              <MiniAvatar url={user?.avatarUrl ?? null} name={user?.fullName ?? ''} />
+              <span className="text-sm font-medium text-gray-700">{user?.fullName?.split(' ')[0]}</span>
+            </button>
+            <button onClick={logout} className="flex h-9 w-9 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500">
+              <LogOut className="h-4.5 w-4.5" />
             </button>
           </div>
         </div>
       </header>
 
-      {/* Mobile header */}
+      {/* Mobile header — logo left, top-right actions */}
       <header className="sticky top-0 z-40 border-b border-lavender-100 bg-white/70 backdrop-blur-xl md:hidden">
         <div className="flex items-center justify-between px-4 py-3">
-          <button
-            onClick={() => navigate('home')}
-            className="flex items-center gap-2"
-          >
+          <button onClick={() => navigate('home')} className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-lavender-400 to-lavender-600 shadow-soft">
               <Leaf className="h-4.5 w-4.5 text-white" />
             </div>
-            <span className="text-base font-bold tracking-tight text-gray-800">
-              Re<span className="text-lavender-600">Nect</span>
-            </span>
+            <span className="text-base font-bold tracking-tight text-gray-800">Re<span className="text-lavender-600">Nect</span></span>
           </button>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => navigate('notifications')}
-              className="relative flex h-9 w-9 items-center justify-center rounded-xl text-gray-400 transition-colors hover:bg-lavender-50 hover:text-lavender-600"
-            >
-              <Bell className="h-5 w-5" />
-              {unreadCount > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-babyblue-500 px-1 text-[10px] font-bold text-white">
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </span>
-              )}
+          <div className="flex items-center gap-1.5">
+            <button onClick={() => navigate('favorites')} className={`flex h-9 w-9 items-center justify-center rounded-full transition-all ${current === 'favorites' ? 'bg-red-50 text-red-500' : 'text-gray-400 hover:bg-lavender-50'}`}>
+              <Heart className="h-5 w-5" />
             </button>
-            <button
-              onClick={logout}
-              className="flex h-9 w-9 items-center justify-center rounded-xl text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
-            >
-              <LogOut className="h-5 w-5" />
+            <button onClick={() => navigate('notifications')} className={`relative flex h-9 w-9 items-center justify-center rounded-full transition-all ${current === 'notifications' ? 'bg-lavender-100 text-lavender-600' : 'text-gray-400 hover:bg-lavender-50'}`}>
+              <Bell className="h-5 w-5" />
+              {unreadCount > 0 && <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-babyblue-500 px-1 text-[10px] font-bold text-white">{unreadCount > 9 ? '9+' : unreadCount}</span>}
+            </button>
+            <button onClick={() => navigate('profile')} className={`flex h-9 w-9 items-center justify-center rounded-full transition-all ${current === 'profile' ? 'bg-lavender-100' : 'hover:bg-lavender-50'}`}>
+              <MiniAvatar url={user?.avatarUrl ?? null} name={user?.fullName ?? ''} />
             </button>
           </div>
         </div>
       </header>
 
-      {/* Mobile bottom nav — rounded floating style */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 px-3 pb-3 md:hidden">
-        <div className="mx-auto flex max-w-sm items-center justify-between rounded-full border border-lavender-100 bg-white/90 px-2 py-2 shadow-soft-lg backdrop-blur-xl">
+      {/* Bottom navigation — required primary sections */}
+      <nav className="fixed bottom-0 left-0 right-0 z-40 px-4 pb-3">
+        <div className="mx-auto flex max-w-lg items-center justify-around rounded-full border border-lavender-100 bg-white/90 px-2 py-2.5 shadow-soft-lg backdrop-blur-xl">
           {BOTTOM_NAV.map((item) => {
             const Icon = item.icon;
             const active = current === item.page;
-            const isCenter = item.page === 'items';
-
-            if (isCenter) {
-              return (
-                <button
-                  key={item.page}
-                  onClick={() => navigate(item.page)}
-                  className="flex h-14 w-14 -translate-y-5 items-center justify-center rounded-full bg-gradient-to-br from-lavender-500 to-lavender-700 text-white shadow-soft-lg transition-transform active:scale-90"
-                >
-                  <Icon className="h-6 w-6" />
-                </button>
-              );
-            }
-
             return (
-              <button
-                key={item.page}
-                onClick={() => navigate(item.page)}
-                className={`relative flex flex-1 flex-col items-center gap-0.5 rounded-full py-1.5 transition-colors ${
-                  active ? 'text-lavender-600' : 'text-gray-400'
-                }`}
-              >
+              <button key={item.page} onClick={() => navigate(item.page)}
+                className={`relative flex flex-1 flex-col items-center gap-0.5 rounded-full py-1 transition-colors ${active ? 'text-lavender-600' : 'text-gray-400'}`}>
                 <Icon className={`h-5 w-5 transition-transform ${active ? 'scale-110' : ''}`} />
                 <span className="text-[9px] font-medium">{item.label}</span>
-                {item.page === 'messages' && unreadCount > 0 && (
-                  <span className="absolute right-2 top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-babyblue-500 px-1 text-[8px] font-bold text-white">
-                    {unreadCount > 9 ? '9+' : unreadCount}
-                  </span>
-                )}
               </button>
             );
           })}
