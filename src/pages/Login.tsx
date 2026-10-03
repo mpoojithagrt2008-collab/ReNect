@@ -11,6 +11,7 @@ import {
   Loader2,
   KeyRound,
   RefreshCw,
+  School,
 } from 'lucide-react';
 import { useApp } from '../store';
 
@@ -57,6 +58,13 @@ function passwordChecks(password: string) {
     { label: '1 special character', met: /[^A-Za-z0-9]/.test(password) },
   ];
 }
+
+const inputClass = (hasError: boolean) =>
+  `w-full rounded-2xl border bg-lavender-50/50 py-3 pl-11 pr-4 text-sm text-gray-800 outline-none transition-all placeholder:text-gray-400 focus:bg-white focus:ring-2 ${
+    hasError
+      ? 'border-red-300 focus:border-red-400 focus:ring-red-100'
+      : 'border-lavender-100 focus:border-lavender-400 focus:ring-lavender-100'
+  }`;
 
 export function Login() {
   const { login, signup, verifyOtp, resendOtp } = useApp();
@@ -223,28 +231,28 @@ export function Login() {
   const checks = passwordChecks(password);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 px-4 py-8">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-lavender-50 via-white to-babyblue-50 px-4 py-8">
       <div className="flex w-full max-w-md flex-col">
         <div className="mb-8 flex flex-col items-center text-center">
-          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-200">
-            <Leaf className="h-8 w-8 text-white" />
+          <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-lavender-400 to-lavender-600 shadow-soft-lg">
+            <Leaf className="h-10 w-10 text-white" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900">
-            Re<span className="text-emerald-600">Nect</span>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-800">
+            Re<span className="text-lavender-600">Nect</span>
           </h1>
-          <p className="mt-2 text-sm text-gray-500">
+          <p className="mt-2 text-sm text-gray-400">
             Borrow, lend and reuse within your campus
           </p>
         </div>
 
-        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-xl shadow-emerald-100/40">
+        <div className="rounded-3xl border border-lavender-100 bg-white/80 p-6 shadow-soft-lg backdrop-blur-sm">
           {mode !== 'otp' && (
-            <div className="mb-5 flex gap-2 rounded-xl bg-gray-100 p-1">
+            <div className="mb-5 flex gap-2 rounded-full bg-lavender-50 p-1.5">
               <button
                 type="button"
                 onClick={() => switchMode('login')}
-                className={`flex-1 rounded-lg py-2 text-sm font-semibold transition-all ${
-                  mode === 'login' ? 'bg-white text-emerald-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                className={`flex-1 rounded-full py-2 text-sm font-semibold transition-all ${
+                  mode === 'login' ? 'bg-white text-lavender-700 shadow-soft' : 'text-gray-400 hover:text-gray-600'
                 }`}
               >
                 Sign In
@@ -252,8 +260,8 @@ export function Login() {
               <button
                 type="button"
                 onClick={() => switchMode('signup')}
-                className={`flex-1 rounded-lg py-2 text-sm font-semibold transition-all ${
-                  mode === 'signup' ? 'bg-white text-emerald-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                className={`flex-1 rounded-full py-2 text-sm font-semibold transition-all ${
+                  mode === 'signup' ? 'bg-white text-lavender-700 shadow-soft' : 'text-gray-400 hover:text-gray-600'
                 }`}
               >
                 Sign Up
@@ -262,26 +270,26 @@ export function Login() {
           )}
 
           {error && (
-            <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+            <div className="mb-4 flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
               <p className="text-xs text-red-600">{error}</p>
             </div>
           )}
 
           {success && (
-            <div className="mb-4 flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-              <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
-              <p className="text-xs text-emerald-600">{success}</p>
+            <div className="mb-4 flex items-start gap-2 rounded-2xl border border-mint-200 bg-mint-50 px-4 py-3">
+              <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-mint-600" />
+              <p className="text-xs text-mint-700">{success}</p>
             </div>
           )}
 
           {mode === 'otp' ? (
             <form onSubmit={handleVerifyOtp} className="space-y-4">
               <div className="text-center">
-                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-50">
-                  <KeyRound className="h-6 w-6 text-emerald-600" />
+                <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-lavender-100">
+                  <KeyRound className="h-7 w-7 text-lavender-600" />
                 </div>
-                <h2 className="text-base font-semibold text-gray-900">Verify your email</h2>
+                <h2 className="text-base font-semibold text-gray-800">Verify your email</h2>
                 <p className="mt-1 text-xs text-gray-500">
                   Enter the 6-digit code sent to <span className="font-medium text-gray-700">{email}</span>
                 </p>
@@ -298,7 +306,7 @@ export function Login() {
                     value={digit}
                     onChange={(e) => handleOtpChange(index, e.target.value)}
                     onKeyDown={(e) => handleOtpKeyDown(index, e)}
-                    className="h-12 w-12 rounded-xl border border-gray-200 bg-gray-50 text-center text-lg font-bold text-gray-900 outline-none transition-colors focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100"
+                    className="h-12 w-12 rounded-2xl border border-lavender-100 bg-lavender-50/50 text-center text-lg font-bold text-gray-800 outline-none transition-all focus:border-lavender-400 focus:bg-white focus:ring-2 focus:ring-lavender-100"
                   />
                 ))}
               </div>
@@ -306,18 +314,12 @@ export function Login() {
               <button
                 type="submit"
                 disabled={loading || otpDigits.join('').length !== 6}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-200 transition-all hover:shadow-emerald-300 active:scale-[0.98] disabled:opacity-60"
+                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-lavender-500 to-lavender-600 py-3 text-sm font-semibold text-white shadow-soft-lg transition-all hover:shadow-lg active:scale-[0.98] disabled:opacity-50"
               >
                 {loading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Verifying...
-                  </>
+                  <><Loader2 className="h-4 w-4 animate-spin" /> Verifying...</>
                 ) : (
-                  <>
-                    Verify Code
-                    <ArrowRight className="h-4 w-4" />
-                  </>
+                  <>Verify Code <ArrowRight className="h-4 w-4" /></>
                 )}
               </button>
 
@@ -325,7 +327,7 @@ export function Login() {
                 <button
                   type="button"
                   onClick={() => switchMode('login')}
-                  className="text-xs font-medium text-gray-500 hover:text-gray-700"
+                  className="text-xs font-medium text-gray-400 hover:text-gray-600"
                 >
                   Back to sign in
                 </button>
@@ -333,7 +335,7 @@ export function Login() {
                   type="button"
                   onClick={handleResendOtp}
                   disabled={resendCooldown > 0 || loading}
-                  className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 hover:text-emerald-700 disabled:text-gray-400"
+                  className="flex items-center gap-1.5 text-xs font-medium text-lavender-600 hover:text-lavender-700 disabled:text-gray-400"
                 >
                   <RefreshCw className="h-3.5 w-3.5" />
                   {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend code'}
@@ -343,125 +345,147 @@ export function Login() {
           ) : mode === 'login' ? (
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700">College Email</label>
+                <label className="mb-1.5 block text-sm font-medium text-gray-600">College Email</label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-gray-400" />
+                  <Mail className="absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-lavender-400" />
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => { setEmail(e.target.value); if (fieldErrors.email) setFieldErrors((p) => ({ ...p, email: '' })); }}
                     placeholder="name@college.edu"
-                    className={`w-full rounded-xl border bg-gray-50 py-2.5 pl-10 pr-4 text-sm text-gray-900 outline-none transition-colors focus:bg-white focus:ring-2 ${fieldErrors.email ? 'border-red-300 focus:border-red-400 focus:ring-red-100' : 'border-gray-200 focus:border-emerald-400 focus:ring-emerald-100'}`}
+                    className={inputClass(!!fieldErrors.email)}
                   />
                 </div>
                 {fieldErrors.email && <p className="mt-1 text-xs text-red-500">{fieldErrors.email}</p>}
               </div>
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700">Password</label>
+                <label className="mb-1.5 block text-sm font-medium text-gray-600">Password</label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-gray-400" />
+                  <Lock className="absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-lavender-400" />
                   <input
                     type="password"
                     value={password}
                     onChange={(e) => { setPassword(e.target.value); if (fieldErrors.password) setFieldErrors((p) => ({ ...p, password: '' })); }}
                     placeholder="Enter your password"
-                    className={`w-full rounded-xl border bg-gray-50 py-2.5 pl-10 pr-4 text-sm text-gray-900 outline-none transition-colors focus:bg-white focus:ring-2 ${fieldErrors.password ? 'border-red-300 focus:border-red-400 focus:ring-red-100' : 'border-gray-200 focus:border-emerald-400 focus:ring-emerald-100'}`}
+                    className={inputClass(!!fieldErrors.password)}
                   />
                 </div>
                 {fieldErrors.password && <p className="mt-1 text-xs text-red-500">{fieldErrors.password}</p>}
               </div>
+              <div className="flex justify-end">
+                <button type="button" className="text-xs font-medium text-lavender-500 hover:text-lavender-600">
+                  Forgot password?
+                </button>
+              </div>
               <button
                 type="submit"
                 disabled={loading}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-200 transition-all hover:shadow-emerald-300 active:scale-[0.98] disabled:opacity-60"
+                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-lavender-500 to-lavender-600 py-3 text-sm font-semibold text-white shadow-soft-lg transition-all hover:shadow-lg active:scale-[0.98] disabled:opacity-50"
               >
                 {loading ? (<><Loader2 className="h-4 w-4 animate-spin" /> Signing in...</>) : (<>Sign In <ArrowRight className="h-4 w-4" /></>)}
               </button>
+              <div className="relative my-2">
+                <div className="border-t border-lavender-100" />
+                <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white px-3 text-xs text-gray-400">or</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setError('Google login is not yet configured for this project.')}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl border border-lavender-100 bg-white py-3 text-sm font-medium text-gray-600 transition-all hover:bg-lavender-50 active:scale-[0.98]"
+              >
+                <svg className="h-5 w-5" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                </svg>
+                Continue with Google
+              </button>
               <p className="text-center text-xs text-gray-400">
                 Don't have an account?{' '}
-                <button type="button" onClick={() => switchMode('signup')} className="font-semibold text-emerald-600 hover:text-emerald-700">Sign up here</button>
+                <button type="button" onClick={() => switchMode('signup')} className="font-semibold text-lavender-600 hover:text-lavender-700">Sign up here</button>
               </p>
             </form>
           ) : (
             <form onSubmit={handleSignup} className="space-y-4">
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700">Student Name</label>
+                <label className="mb-1.5 block text-sm font-medium text-gray-600">Student Name</label>
                 <div className="relative">
-                  <GraduationCap className="absolute left-3 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-gray-400" />
+                  <GraduationCap className="absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-lavender-400" />
                   <input
                     type="text"
                     value={name}
                     onChange={(e) => { setName(e.target.value); if (fieldErrors.name) setFieldErrors((p) => ({ ...p, name: '' })); }}
                     placeholder="e.g. Aarav Sharma"
-                    className={`w-full rounded-xl border bg-gray-50 py-2.5 pl-10 pr-4 text-sm text-gray-900 outline-none transition-colors focus:bg-white focus:ring-2 ${fieldErrors.name ? 'border-red-300 focus:border-red-400 focus:ring-red-100' : 'border-gray-200 focus:border-emerald-400 focus:ring-emerald-100'}`}
+                    className={inputClass(!!fieldErrors.name)}
                   />
                 </div>
                 {fieldErrors.name && <p className="mt-1 text-xs text-red-500">{fieldErrors.name}</p>}
               </div>
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700">College Email</label>
+                <label className="mb-1.5 block text-sm font-medium text-gray-600">College Email</label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-gray-400" />
+                  <Mail className="absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-lavender-400" />
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => { setEmail(e.target.value); if (fieldErrors.email) setFieldErrors((p) => ({ ...p, email: '' })); }}
                     placeholder="name@college.edu"
-                    className={`w-full rounded-xl border bg-gray-50 py-2.5 pl-10 pr-4 text-sm text-gray-900 outline-none transition-colors focus:bg-white focus:ring-2 ${fieldErrors.email ? 'border-red-300 focus:border-red-400 focus:ring-red-100' : 'border-gray-200 focus:border-emerald-400 focus:ring-emerald-100'}`}
+                    className={inputClass(!!fieldErrors.email)}
                   />
                 </div>
                 {fieldErrors.email && <p className="mt-1 text-xs text-red-500">{fieldErrors.email}</p>}
               </div>
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700">College ID</label>
+                <label className="mb-1.5 block text-sm font-medium text-gray-600">College ID</label>
                 <div className="relative">
-                  <IdCard className="absolute left-3 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-gray-400" />
+                  <IdCard className="absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-lavender-400" />
                   <input
                     type="text"
                     value={studentId}
                     onChange={(e) => { setStudentId(e.target.value); if (fieldErrors.studentId) setFieldErrors((p) => ({ ...p, studentId: '' })); }}
                     placeholder="e.g. R123456"
-                    className={`w-full rounded-xl border bg-gray-50 py-2.5 pl-10 pr-4 text-sm text-gray-900 outline-none transition-colors focus:bg-white focus:ring-2 ${fieldErrors.studentId ? 'border-red-300 focus:border-red-400 focus:ring-red-100' : 'border-gray-200 focus:border-emerald-400 focus:ring-emerald-100'}`}
+                    className={inputClass(!!fieldErrors.studentId)}
                   />
                 </div>
                 {fieldErrors.studentId && <p className="mt-1 text-xs text-red-500">{fieldErrors.studentId}</p>}
               </div>
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700">College</label>
+                <label className="mb-1.5 block text-sm font-medium text-gray-600">College</label>
                 <div className="relative">
-                  <GraduationCap className="absolute left-3 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-gray-400" />
+                  <School className="absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-lavender-400" />
                   <input
                     type="text"
                     value={college}
                     onChange={(e) => { setCollege(e.target.value); if (fieldErrors.college) setFieldErrors((p) => ({ ...p, college: '' })); }}
-                    placeholder="e.g. IIT Bombay"
-                    className={`w-full rounded-xl border bg-gray-50 py-2.5 pl-10 pr-4 text-sm text-gray-900 outline-none transition-colors focus:bg-white focus:ring-2 ${fieldErrors.college ? 'border-red-300 focus:border-red-400 focus:ring-red-100' : 'border-gray-200 focus:border-emerald-400 focus:ring-emerald-100'}`}
+                    placeholder="e.g. RGUKT RKV"
+                    className={inputClass(!!fieldErrors.college)}
                   />
                 </div>
                 {fieldErrors.college && <p className="mt-1 text-xs text-red-500">{fieldErrors.college}</p>}
               </div>
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700">Password</label>
+                <label className="mb-1.5 block text-sm font-medium text-gray-600">Password</label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-gray-400" />
+                  <Lock className="absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-lavender-400" />
                   <input
                     type="password"
                     value={password}
                     onChange={(e) => { setPassword(e.target.value); setShowPasswordReqs(true); if (fieldErrors.password) setFieldErrors((p) => ({ ...p, password: '' })); }}
                     onFocus={() => setShowPasswordReqs(true)}
                     placeholder="Create a strong password"
-                    className={`w-full rounded-xl border bg-gray-50 py-2.5 pl-10 pr-4 text-sm text-gray-900 outline-none transition-colors focus:bg-white focus:ring-2 ${fieldErrors.password ? 'border-red-300 focus:border-red-400 focus:ring-red-100' : 'border-gray-200 focus:border-emerald-400 focus:ring-emerald-100'}`}
+                    className={inputClass(!!fieldErrors.password)}
                   />
                 </div>
                 {fieldErrors.password && <p className="mt-1 text-xs text-red-500">{fieldErrors.password}</p>}
                 {showPasswordReqs && (
-                  <div className="mt-2 rounded-lg bg-gray-50 px-3 py-2.5">
+                  <div className="mt-2 rounded-2xl bg-lavender-50/50 px-4 py-3">
                     <p className="mb-1.5 text-[11px] font-medium text-gray-500">Password requirements:</p>
                     <div className="space-y-1">
                       {checks.map((check) => (
                         <div key={check.label} className="flex items-center gap-1.5">
-                          {check.met ? <CheckCircle className="h-3 w-3 text-emerald-500" /> : <div className="h-3 w-3 rounded-full border border-gray-300" />}
-                          <span className={`text-[11px] ${check.met ? 'text-emerald-600' : 'text-gray-400'}`}>{check.label}</span>
+                          {check.met ? <CheckCircle className="h-3 w-3 text-mint-500" /> : <div className="h-3 w-3 rounded-full border border-gray-300" />}
+                          <span className={`text-[11px] ${check.met ? 'text-mint-600' : 'text-gray-400'}`}>{check.label}</span>
                         </div>
                       ))}
                     </div>
@@ -471,13 +495,13 @@ export function Login() {
               <button
                 type="submit"
                 disabled={loading}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-200 transition-all hover:shadow-emerald-300 active:scale-[0.98] disabled:opacity-60"
+                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-lavender-500 to-lavender-600 py-3 text-sm font-semibold text-white shadow-soft-lg transition-all hover:shadow-lg active:scale-[0.98] disabled:opacity-50"
               >
                 {loading ? (<><Loader2 className="h-4 w-4 animate-spin" /> Creating account...</>) : (<>Create Account <ArrowRight className="h-4 w-4" /></>)}
               </button>
               <p className="text-center text-xs text-gray-400">
                 Already have an account?{' '}
-                <button type="button" onClick={() => switchMode('login')} className="font-semibold text-emerald-600 hover:text-emerald-700">Sign in here</button>
+                <button type="button" onClick={() => switchMode('login')} className="font-semibold text-lavender-600 hover:text-lavender-700">Sign in here</button>
               </p>
             </form>
           )}

@@ -1,9 +1,9 @@
 import type { Condition } from '../types';
 
 const CONDITION_STYLES: Record<Condition, string> = {
-  New: 'bg-emerald-100 text-emerald-700 ring-emerald-200',
-  'Like New': 'bg-teal-100 text-teal-700 ring-teal-200',
-  Good: 'bg-sky-100 text-sky-700 ring-sky-200',
+  New: 'bg-mint-100 text-mint-700 ring-mint-200',
+  'Like New': 'bg-babyblue-100 text-babyblue-700 ring-babyblue-200',
+  Good: 'bg-lavender-100 text-lavender-700 ring-lavender-200',
   Fair: 'bg-amber-100 text-amber-700 ring-amber-200',
 };
 
@@ -20,7 +20,7 @@ export function ConditionBadge({ condition }: { condition: Condition }) {
 export function VerifiedBadge({ verified }: { verified: boolean }) {
   if (!verified) return null;
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-600">
+    <span className="inline-flex items-center gap-1 rounded-full bg-babyblue-50 px-2 py-0.5 text-xs font-medium text-babyblue-600">
       <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20">
         <path
           fillRule="evenodd"
