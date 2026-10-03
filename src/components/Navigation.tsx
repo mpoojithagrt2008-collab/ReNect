@@ -7,6 +7,7 @@ import {
   LogOut,
   Bell,
   Heart,
+  MessageCircle,
 } from 'lucide-react';
 import { useApp } from '../store';
 
@@ -22,6 +23,7 @@ const BOTTOM_NAV: { page: Page; label: string; icon: typeof HomeIcon }[] = [
   { page: 'explore', label: 'Explore', icon: Compass },
   { page: 'rentals', label: 'Rentals', icon: CalendarCheck },
   { page: 'items', label: 'My Items', icon: Package },
+  { page: 'messages', label: 'Chat', icon: MessageCircle },
 ];
 
 function MiniAvatar({ url, name }: { url: string | null; name: string }) {
@@ -34,7 +36,7 @@ function MiniAvatar({ url, name }: { url: string | null; name: string }) {
 }
 
 export function Navigation({ current, navigate }: Props) {
-  const { user, logout, unreadCount } = useApp();
+  const { user, logout, unreadCount, unreadMessageCount } = useApp();
 
   return (
     <>
@@ -51,6 +53,10 @@ export function Navigation({ current, navigate }: Props) {
           <div className="flex items-center gap-2">
             <button onClick={() => navigate('favorites')} className={`flex h-9 w-9 items-center justify-center rounded-full transition-all ${current === 'favorites' ? 'bg-red-50 text-red-500' : 'text-gray-400 hover:bg-lavender-50 hover:text-lavender-600'}`}>
               <Heart className="h-5 w-5" />
+            </button>
+            <button onClick={() => navigate('messages')} className={`relative flex h-9 w-9 items-center justify-center rounded-full transition-all ${current === 'messages' ? 'bg-lavender-100 text-lavender-600' : 'text-gray-400 hover:bg-lavender-50 hover:text-lavender-600'}`}>
+              <MessageCircle className="h-5 w-5" />
+              {unreadMessageCount > 0 && <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-lavender-500 px-1 text-[10px] font-bold text-white">{unreadMessageCount > 9 ? '9+' : unreadMessageCount}</span>}
             </button>
             <button onClick={() => navigate('notifications')} className={`relative flex h-9 w-9 items-center justify-center rounded-full transition-all ${current === 'notifications' ? 'bg-lavender-100 text-lavender-600' : 'text-gray-400 hover:bg-lavender-50 hover:text-lavender-600'}`}>
               <Bell className="h-5 w-5" />
@@ -80,6 +86,10 @@ export function Navigation({ current, navigate }: Props) {
             <button onClick={() => navigate('favorites')} className={`flex h-9 w-9 items-center justify-center rounded-full transition-all ${current === 'favorites' ? 'bg-red-50 text-red-500' : 'text-gray-400 hover:bg-lavender-50'}`}>
               <Heart className="h-5 w-5" />
             </button>
+            <button onClick={() => navigate('messages')} className={`relative flex h-9 w-9 items-center justify-center rounded-full transition-all ${current === 'messages' ? 'bg-lavender-100 text-lavender-600' : 'text-gray-400 hover:bg-lavender-50'}`}>
+              <MessageCircle className="h-5 w-5" />
+              {unreadMessageCount > 0 && <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-lavender-500 px-1 text-[10px] font-bold text-white">{unreadMessageCount > 9 ? '9+' : unreadMessageCount}</span>}
+            </button>
             <button onClick={() => navigate('notifications')} className={`relative flex h-9 w-9 items-center justify-center rounded-full transition-all ${current === 'notifications' ? 'bg-lavender-100 text-lavender-600' : 'text-gray-400 hover:bg-lavender-50'}`}>
               <Bell className="h-5 w-5" />
               {unreadCount > 0 && <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-babyblue-500 px-1 text-[10px] font-bold text-white">{unreadCount > 9 ? '9+' : unreadCount}</span>}
@@ -97,10 +107,12 @@ export function Navigation({ current, navigate }: Props) {
           {BOTTOM_NAV.map((item) => {
             const Icon = item.icon;
             const active = current === item.page;
+            const badge = item.page === 'messages' ? unreadMessageCount : 0;
             return (
               <button key={item.page} onClick={() => navigate(item.page)}
                 className={`relative flex flex-1 flex-col items-center gap-0.5 rounded-full py-1 transition-colors ${active ? 'text-lavender-600' : 'text-gray-400'}`}>
                 <Icon className={`h-5 w-5 transition-transform ${active ? 'scale-110' : ''}`} />
+                {badge > 0 && <span className="absolute right-1 top-0 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-lavender-500 px-1 text-[9px] font-bold text-white">{badge > 9 ? '9+' : badge}</span>}
                 <span className="text-[9px] font-medium">{item.label}</span>
               </button>
             );

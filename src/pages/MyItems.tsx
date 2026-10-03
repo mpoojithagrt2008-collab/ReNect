@@ -4,7 +4,7 @@ import {
   Camera, Image as ImageIcon, Loader2, AlertCircle, MessageCircle, PackageCheck,
 } from 'lucide-react';
 import { useApp } from '../store';
-import { formatOwnerName } from '../components/ui';
+import { formatOwnerName, formatRentalDuration } from '../components/ui';
 import { CATEGORIES, CONDITIONS } from '../data';
 import { ItemCard } from '../components/ItemCard';
 import type { Category, Condition, PricingType } from '../types';
@@ -240,9 +240,10 @@ export function MyItems({ navigate }: { navigate: (p: import('../components/Navi
                   <img src={req.itemImage} alt={req.itemName} className="h-14 w-14 shrink-0 rounded-2xl object-cover" />
                   <div className="min-w-0 flex-1">
                     <h3 className="truncate text-sm font-semibold text-gray-800">{req.itemName}</h3>
-                    <p className="text-xs text-gray-500">Requested by <span className="font-medium text-gray-700">{formatOwnerName(req.requesterName, profilesMap[req.requesterId]?.studentId || '')}</span></p>
+                    <p className="text-xs text-gray-500"><span className="font-medium text-gray-600">Rented By:</span> <span className="font-medium text-gray-700">{formatOwnerName(req.requesterName, profilesMap[req.requesterId]?.studentId || '')}</span></p>
                     <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-400">
                       <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />{req.startDate} → {req.endDate}</span>
+                      <span><span className="font-medium text-gray-500">Rented For:</span> {formatRentalDuration(req.startDate, req.endDate)}</span>
                     </div>
                     {req.message && (
                       <div className="mt-2 flex items-start gap-1.5 rounded-xl bg-lavender-50/50 px-3 py-2 text-xs text-gray-600">

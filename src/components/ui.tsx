@@ -43,6 +43,14 @@ export function formatOwnerName(name: string, studentId: string): string {
   return `${name} (${studentId})`;
 }
 
+export function formatRentalDuration(startDate: string, endDate: string): string {
+  if (!startDate || !endDate) return '—';
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+  return `${days} ${days === 1 ? 'Day' : 'Days'}`;
+}
+
 export function StarRatingDisplay({ rating, count, size = 'h-4 w-4' }: { rating: number; count?: number; size?: string }) {
   return (
     <span className="inline-flex items-center gap-1">

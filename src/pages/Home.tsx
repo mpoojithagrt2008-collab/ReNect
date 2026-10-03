@@ -9,6 +9,8 @@ import {
   Repeat,
   Clock,
   Heart,
+  Compass,
+  MessageCircle,
 } from 'lucide-react';
 import { useApp } from '../store';
 import { CATEGORIES } from '../data';
@@ -120,33 +122,26 @@ export function Home({ navigate }: Props) {
       </div>
 
       {/* Quick action cards */}
-      <div className="mb-6 grid grid-cols-3 gap-3">
-        <button
-          onClick={() => navigate('rentals')}
-          className="flex flex-col items-center gap-2 rounded-3xl border border-lavender-100 bg-white p-4 shadow-card transition-all hover:shadow-soft-lg hover:-translate-y-0.5"
-        >
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-lavender-100">
-            <Repeat className="h-5 w-5 text-lavender-600" />
-          </div>
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
+        <button onClick={() => navigate('rentals')} className="flex flex-col items-center gap-2 rounded-3xl border border-lavender-100 bg-white p-4 shadow-card transition-all hover:-translate-y-0.5 hover:shadow-soft-lg">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-lavender-100"><Repeat className="h-5 w-5 text-lavender-600" /></div>
           <span className="text-xs font-medium text-gray-600">My Rentals</span>
         </button>
-        <button
-          onClick={() => navigate('favorites')}
-          className="flex flex-col items-center gap-2 rounded-3xl border border-lavender-100 bg-white p-4 shadow-card transition-all hover:shadow-soft-lg hover:-translate-y-0.5"
-        >
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-red-50">
-            <Heart className="h-5 w-5 text-red-500" />
-          </div>
+        <button onClick={() => navigate('favorites')} className="flex flex-col items-center gap-2 rounded-3xl border border-lavender-100 bg-white p-4 shadow-card transition-all hover:-translate-y-0.5 hover:shadow-soft-lg">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-red-50"><Heart className="h-5 w-5 text-red-500" /></div>
           <span className="text-xs font-medium text-gray-600">Favorites</span>
         </button>
-        <button
-          onClick={() => navigate('notifications')}
-          className="flex flex-col items-center gap-2 rounded-3xl border border-lavender-100 bg-white p-4 shadow-card transition-all hover:shadow-soft-lg hover:-translate-y-0.5"
-        >
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-babyblue-100">
-            <TrendingUp className="h-5 w-5 text-babyblue-600" />
-          </div>
-          <span className="text-xs font-medium text-gray-600">Alerts</span>
+        <button onClick={() => navigate('items')} className="flex flex-col items-center gap-2 rounded-3xl border border-lavender-100 bg-white p-4 shadow-card transition-all hover:-translate-y-0.5 hover:shadow-soft-lg">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-mint-100"><Package className="h-5 w-5 text-mint-600" /></div>
+          <span className="text-xs font-medium text-gray-600">My Items</span>
+        </button>
+        <button onClick={() => navigate('explore')} className="flex flex-col items-center gap-2 rounded-3xl border border-lavender-100 bg-white p-4 shadow-card transition-all hover:-translate-y-0.5 hover:shadow-soft-lg">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-babyblue-100"><Compass className="h-5 w-5 text-babyblue-600" /></div>
+          <span className="text-xs font-medium text-gray-600">Explore</span>
+        </button>
+        <button onClick={() => navigate('messages')} className="col-span-2 flex flex-col items-center gap-2 rounded-3xl border border-lavender-100 bg-white p-4 shadow-card transition-all hover:-translate-y-0.5 hover:shadow-soft-lg sm:col-span-1">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-lavender-100"><MessageCircle className="h-5 w-5 text-lavender-600" /></div>
+          <span className="text-xs font-medium text-gray-600">Chat</span>
         </button>
       </div>
 

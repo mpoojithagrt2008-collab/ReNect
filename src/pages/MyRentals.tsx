@@ -3,7 +3,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { useApp } from '../store';
-import { formatOwnerName } from '../components/ui';
+import { formatOwnerName, formatRentalDuration } from '../components/ui';
 import type { Page } from '../components/Navigation';
 import type { BorrowRequest, RequestStatus } from '../types';
 import { RatingReview } from '../components/RatingReview';
@@ -64,8 +64,9 @@ export function MyRentals({ navigate }: Props) {
         <img src={req.itemImage} alt={req.itemName} className="h-16 w-16 shrink-0 rounded-2xl object-cover" />
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-sm font-semibold text-gray-800">{req.itemName}</h3>
-          <p className="text-xs text-gray-400">From {formatOwnerName(req.ownerName, profilesMap[req.ownerId]?.studentId || '')}</p>
-          <div className="mt-1 flex items-center gap-3 text-xs text-gray-400">
+          <p className="text-xs text-gray-500"><span className="font-medium text-gray-600">Rented By:</span> {formatOwnerName(req.requesterName, profilesMap[req.requesterId]?.studentId || '')}</p>
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-400">
+            <span><span className="font-medium text-gray-500">Rented For:</span> {formatRentalDuration(req.startDate, req.endDate)}</span>
             <span>{formatDate(req.startDate)} → {formatDate(req.endDate)}</span>
           </div>
           {hasReturn && (

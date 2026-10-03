@@ -59,6 +59,10 @@ interface AppContextType {
   setActiveChatRequestId: (id: string | null) => void;
   fetchMessages: (requestId: string) => Promise<void>;
   sendMessage: (requestId: string, receiverId: string, text: string) => Promise<{ error: string | null }>;
+  unreadMessageCount: number;
+  unreadByRequest: Record<string, number>;
+  fetchUnreadMessages: () => Promise<void>;
+  markMessagesRead: (requestId: string) => Promise<void>;
   updateAvatar: (file: File) => Promise<{ error: string | null }>;
   removeAvatar: () => Promise<{ error: string | null }>;
   favorites: Favorite[];
@@ -170,11 +174,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [returns, setReturns] = useState<ReturnRecord[]>([]);
   const [damagePenalties, setDamagePenalties] = useState<DamagePenalty[]>([]);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
+  const [unreadByRequest, setUnreadByRequest] = useState<Record<string, number>>({});
   const sessionRef = useRef<Session | null>(null);
   const activeChatRef = useRef<string | null>(null);
   const messagesChannelRef = useRef<any>(null);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
+  const unreadMessageCount = Object.values(unreadByRequest).reduce((sum, n) => sum + n, 0);
   const favoriteIds = new Set(favorites.map((f) => f.listingId));
   const returnsMap: Record<string, ReturnRecord> = {};
   for (const r of returns) returnsMap[r.requestId] = r;
@@ -381,6 +387,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
     setMessages(parsed);
   }, [profilesMap]);
+
+  const fetchUnreadMessages = useCallback(async () => {
+    const userId = sessionRef.current?.user?.id;
+    if (!userId) return;
+    const { data, error } = await supabase
+      .from('messages')
+      .select('request_id')
+      .eq('receiver_id', userId)
+      .is('read_at', null);
+    if (error || !data) return;
+    const counts: Record<string, number> = {};
+    for (const m of data) counts[m.request_id] = (counts[m.request_id] || 0) + 1;
+    setUnreadByRequest(counts);
+  }, []);
+
+  const markMessagesRead = useCallback(async (requestId: string) => {
+    const userId = sessionRef.current?.user?.id;
+    if (!userId) return;
+    await supabase
+      .from('messages')
+      .update({ read_at: new Date().toISOString() })
+      .eq('request_id', requestId)
+      .eq('receiver_id', userId)
+      .is('read_at', null);
+    setUnreadByRequest((prev) => ({ ...prev, [requestId]: 0 }));
+  }, []);
 
   // Send a message
   const sendMessage = useCallback(async (requestId: string, receiverId: string, text: string): Promise<{ error: string | null }> => {
@@ -855,6 +887,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             fetchRequests(session.user.id);
             fetchFavorites();
             fetchReviewedRequestIds();
+            fetchUnreadMessages();
           }
           setAuthLoading(false);
         });
@@ -878,6 +911,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setReturns([]);
         setDamagePenalties([]);
         setPayments([]);
+        setUnreadByRequest({});
         setActiveChatRequestId(null);
         activeChatRef.current = null;
         setAuthLoading(false);
@@ -907,6 +941,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           fetchReturns();
           fetchPenalties();
           fetchPayments();
+          fetchUnreadMessages();
           supabase.rpc('complete_expired_rentals').then(() => {
             fetchListings();
           });
@@ -980,6 +1015,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       })
       .subscribe();
 
+    const messagesChannel = supabase
+      .channel('messages-unread-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
+        fetchUnreadMessages();
+      })
+      .subscribe();
+
     const expiredInterval = setInterval(() => {
       supabase.rpc('complete_expired_rentals').then(() => {
         fetchListings();
@@ -1001,6 +1043,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       supabase.removeChannel(returnsChannel);
       supabase.removeChannel(penaltiesChannel);
       supabase.removeChannel(paymentsChannel);
+      supabase.removeChannel(messagesChannel);
       if (messagesChannelRef.current) {
         supabase.removeChannel(messagesChannelRef.current);
         messagesChannelRef.current = null;
@@ -1022,6 +1065,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (activeChatRequestId) {
       // Fetch initial messages
       fetchMessages(activeChatRequestId);
+      markMessagesRead(activeChatRequestId);
 
       // Subscribe to new messages for this specific request
       const channel = supabase
@@ -1036,6 +1080,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           },
           () => {
             fetchMessages(activeChatRequestId);
+            markMessagesRead(activeChatRequestId);
           },
         )
         .subscribe();
@@ -1049,7 +1094,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         messagesChannelRef.current = null;
       }
     };
-  }, [activeChatRequestId, fetchMessages]);
+  }, [activeChatRequestId, fetchMessages, markMessagesRead]);
 
   useEffect(() => {
     if (user) {
@@ -1203,6 +1248,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         fetchReturns();
         fetchPenalties();
         fetchPayments();
+        fetchUnreadMessages();
       }
 
       return { error: null };
@@ -1230,6 +1276,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setDamagePenalties([]);
     setPayments([]);
     setActiveChatRequestId(null);
+    setUnreadByRequest({});
   }, []);
 
   const deleteAccount = useCallback(async (): Promise<{ error: string | null }> => {
@@ -1251,6 +1298,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setDamagePenalties([]);
     setPayments([]);
     setActiveChatRequestId(null);
+    setUnreadByRequest({});
     return { error: null };
   }, [user]);
 
@@ -1474,6 +1522,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setActiveChatRequestId,
         fetchMessages,
         sendMessage,
+        unreadMessageCount,
+        unreadByRequest,
+        fetchUnreadMessages,
+        markMessagesRead,
         updateAvatar,
         removeAvatar,
         favorites,

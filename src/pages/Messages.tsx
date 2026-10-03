@@ -3,6 +3,8 @@ import {
   MessageCircle, Package, ArrowLeft, Send, Loader2,
 } from 'lucide-react';
 import { useApp } from '../store';
+import { supabase } from '../lib/supabase';
+import { formatOwnerName, formatRentalDuration } from '../components/ui';
 import type { Page } from '../components/Navigation';
 import type { RequestStatus } from '../types';
 
@@ -36,21 +38,47 @@ function ChatAvatar({ name, imageUrl }: { name: string; imageUrl?: string }) {
 }
 
 export function Messages({ navigate }: Props) {
-  const { requests, user, messages, activeChatRequestId, setActiveChatRequestId, fetchMessages, sendMessage, profilesMap } = useApp();
+  const { requests, user, messages, activeChatRequestId, setActiveChatRequestId, fetchMessages, sendMessage, profilesMap, unreadByRequest } = useApp();
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [latestByRequest, setLatestByRequest] = useState<Record<string, { text: string; timestamp: string }>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const myConversations = requests.filter(
-    (r) => (r.requesterId === user?.id || r.ownerId === user?.id) && (r.status === 'accepted' || r.status === 'completed'),
+    (r) => (r.requesterId === user?.id || r.ownerId === user?.id) && r.status === 'accepted',
   );
 
   const activeChat = myConversations.find((r) => r.id === activeChatRequestId) || null;
 
   useEffect(() => {
+    const requestIds = myConversations.map((request) => request.id);
+    if (requestIds.length === 0) {
+      setLatestByRequest({});
+      return;
+    }
+
+    let cancelled = false;
+    supabase
+      .from('messages')
+      .select('request_id, body, created_at')
+      .in('request_id', requestIds)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => {
+        if (cancelled || !data) return;
+        const latest: Record<string, { text: string; timestamp: string }> = {};
+        for (const message of data) {
+          if (!latest[message.request_id]) latest[message.request_id] = { text: message.body, timestamp: message.created_at };
+        }
+        setLatestByRequest(latest);
+      });
+
+    return () => { cancelled = true; };
+  }, [myConversations.length, user?.id, messages.length]);
+
+  useEffect(() => {
     if (activeChatRequestId) fetchMessages(activeChatRequestId);
-  }, [activeChatRequestId]);
+  }, [activeChatRequestId, fetchMessages]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -71,8 +99,11 @@ export function Messages({ navigate }: Props) {
   // Chat view
   if (activeChat) {
     const isOwner = activeChat.ownerId === user?.id;
-    const otherName = isOwner ? activeChat.requesterName : activeChat.ownerName;
     const otherProfile = isOwner ? profilesMap[activeChat.requesterId] : profilesMap[activeChat.ownerId];
+    const otherName = formatOwnerName(
+      isOwner ? activeChat.requesterName : activeChat.ownerName,
+      otherProfile?.studentId || '',
+    );
 
     return (
       <div className="mx-auto flex max-w-2xl flex-col px-4 py-6 md:px-6 md:py-8" style={{ minHeight: 'calc(100vh - 200px)' }}>
@@ -87,7 +118,7 @@ export function Messages({ navigate }: Props) {
           <div className="min-w-0 flex-1">
             <h3 className="truncate text-sm font-semibold text-gray-800">{otherName}</h3>
             <p className="truncate text-xs text-gray-400">{activeChat.itemName}</p>
-            <p className="mt-0.5 text-xs text-gray-400">{formatDate(activeChat.startDate)} → {formatDate(activeChat.endDate)}</p>
+            <p className="mt-0.5 text-xs text-gray-400">Rented For: {formatRentalDuration(activeChat.startDate, activeChat.endDate)} · {formatDate(activeChat.startDate)} → {formatDate(activeChat.endDate)}</p>
           </div>
         </div>
 
@@ -144,9 +175,13 @@ export function Messages({ navigate }: Props) {
         <div className="space-y-2">
           {myConversations.map((req) => {
             const isOwner = req.ownerId === user?.id;
-            const otherName = isOwner ? req.requesterName : req.ownerName;
             const otherProfile = isOwner ? profilesMap[req.requesterId] : profilesMap[req.ownerId];
-            const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null;
+            const otherName = formatOwnerName(
+              isOwner ? req.requesterName : req.ownerName,
+              otherProfile?.studentId || '',
+            );
+            const lastMsg = latestByRequest[req.id];
+            const unread = unreadByRequest[req.id] || 0;
 
             return (
               <button
@@ -157,13 +192,17 @@ export function Messages({ navigate }: Props) {
                 <ChatAvatar name={otherName} imageUrl={otherProfile?.avatarUrl || undefined} />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
-                    <h3 className="truncate text-sm font-semibold text-gray-800">{otherName}</h3>
-                    <span className={`flex shrink-0 items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold capitalize ring-1 ring-inset ${STATUS_STYLES[req.status]}`}>
-                      {req.status}
-                    </span>
+                    <h3 className={`truncate text-sm font-semibold ${unread > 0 ? 'text-gray-900' : 'text-gray-800'}`}>{otherName}</h3>
+                    {unread > 0 ? (
+                      <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-lavender-500 px-1.5 text-[11px] font-bold text-white">{unread > 9 ? '9+' : unread}</span>
+                    ) : (
+                      <span className={`flex shrink-0 items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold capitalize ring-1 ring-inset ${STATUS_STYLES[req.status]}`}>
+                        {req.status}
+                      </span>
+                    )}
                   </div>
-                  <p className="truncate text-xs text-gray-500">{lastMsg ? lastMsg.text : req.itemName}</p>
-                  <p className="mt-0.5 text-[11px] text-gray-400">{formatDate(req.startDate)} → {formatDate(req.endDate)}</p>
+                  <p className={`truncate text-xs ${unread > 0 ? 'font-medium text-gray-700' : 'text-gray-500'}`}>{lastMsg ? lastMsg.text : req.itemName}</p>
+                  <p className="mt-0.5 text-[11px] text-gray-400">{lastMsg ? formatTime(lastMsg.timestamp) : formatDate(req.startDate)} · Rented For: {formatRentalDuration(req.startDate, req.endDate)}</p>
                 </div>
               </button>
             );
