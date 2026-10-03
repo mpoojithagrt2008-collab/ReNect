@@ -10,6 +10,7 @@ export type Category =
 export type Condition = 'New' | 'Like New' | 'Good' | 'Fair';
 
 export type RequestStatus = 'pending' | 'accepted' | 'rejected' | 'completed';
+export type Availability = 'available' | 'unavailable';
 
 export interface Item {
   id: string;
@@ -23,6 +24,7 @@ export interface Item {
   ownerId: string;
   ownerName: string;
   verified: boolean;
+  availability: Availability;
   createdAt: string;
 }
 

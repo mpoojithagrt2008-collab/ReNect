@@ -7,6 +7,8 @@ interface Props {
 }
 
 export function ItemCard({ item, onClick }: Props) {
+  const isAvailable = item.availability === 'available';
+
   return (
     <button
       onClick={onClick}
@@ -22,10 +24,15 @@ export function ItemCard({ item, onClick }: Props) {
         <div className="absolute left-3 top-3">
           <ConditionBadge condition={item.condition} />
         </div>
-        {item.pricePerDay === 0 && (
-          <div className="absolute right-3 top-3 rounded-full bg-emerald-500 px-2.5 py-0.5 text-xs font-bold text-white shadow-sm">
-            FREE
-          </div>
+        <div
+          className={`absolute right-3 top-3 rounded-full px-2.5 py-0.5 text-xs font-bold text-white shadow-sm ${
+            isAvailable ? 'bg-emerald-500' : 'bg-gray-500'
+          }`}
+        >
+          {isAvailable ? 'AVAILABLE' : 'UNAVAILABLE'}
+        </div>
+        {!isAvailable && (
+          <div className="absolute inset-0 bg-gray-900/30" />
         )}
       </div>
       <div className="flex flex-1 flex-col gap-2 p-4">

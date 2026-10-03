@@ -21,7 +21,7 @@ import { ItemCard } from '../components/ItemCard';
 import type { Category, Condition } from '../types';
 
 export function MyItems() {
-  const { user, items, addListing, deleteListing, requests, updateRequestStatus } = useApp();
+  const { user, items, addListing, deleteListing, requests, updateRequestStatus, markReturned } = useApp();
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState('');
   const [category, setCategory] = useState<Category>('Books');
@@ -403,20 +403,43 @@ export function MyItems() {
                   {req.status === 'pending' && (
                     <div className="flex gap-2">
                       <button
-                        onClick={() => updateRequestStatus(req.id, 'accepted')}
+                        onClick={async () => {
+                          const result = await updateRequestStatus(req.id, 'accepted');
+                          if (result?.error) {
+                            setDeleteError(result.error);
+                            setTimeout(() => setDeleteError(null), 4000);
+                          }
+                        }}
                         className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-700"
                       >
                         <Check className="h-3.5 w-3.5" />
                         Accept
                       </button>
                       <button
-                        onClick={() => updateRequestStatus(req.id, 'rejected')}
+                        onClick={async () => {
+                          await updateRequestStatus(req.id, 'rejected');
+                        }}
                         className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600"
                       >
                         <X className="h-3.5 w-3.5" />
                         Reject
                       </button>
                     </div>
+                  )}
+                  {req.status === 'accepted' && (
+                    <button
+                      onClick={async () => {
+                        const result = await markReturned(req.id);
+                        if (result?.error) {
+                          setDeleteError(result.error);
+                          setTimeout(() => setDeleteError(null), 4000);
+                        }
+                      }}
+                      className="flex items-center gap-1.5 rounded-lg bg-teal-600 px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-teal-700"
+                    >
+                      <Check className="h-3.5 w-3.5" />
+                      Mark Returned
+                    </button>
                   )}
                 </div>
               </div>

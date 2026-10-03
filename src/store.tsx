@@ -9,14 +9,14 @@ import {
 } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
-import type { Item, BorrowRequest, UserProfile, RequestStatus } from './types';
+import type { Item, BorrowRequest, UserProfile, RequestStatus, Availability } from './types';
 import { PLACEHOLDER_IMAGES } from './data';
 import type { Category, Condition } from './types';
 
 interface AppContextType {
   user: UserProfile | null;
   authLoading: boolean;
-  signup: (name: string, email: string, password: string, studentId: string, college: string) => Promise<{ error: string | null }>;
+  signup: (name: string, email: string, password: string, studentId: string, college: string) => Promise<{ error: string | null; needsEmailConfirmation?: boolean }>;
   login: (email: string, password: string) => Promise<{ error: string | null }>;
   logout: () => void;
   deleteAccount: () => Promise<{ error: string | null }>;
@@ -40,7 +40,8 @@ interface AppContextType {
     endDate: string;
     message: string;
   }) => Promise<{ error: string | null }>;
-  updateRequestStatus: (id: string, status: RequestStatus) => Promise<void>;
+  updateRequestStatus: (id: string, status: RequestStatus) => Promise<{ error: string | null }>;
+  markReturned: (requestId: string) => Promise<{ error: string | null }>;
   selectedItemId: string | null;
   setSelectedItemId: (id: string | null) => void;
   profilesMap: Record<string, UserProfile>;
@@ -61,6 +62,7 @@ function parseItem(row: any, ownerName: string, ownerVerified: boolean): Item {
     ownerId: row.owner_id,
     ownerName,
     verified: ownerVerified,
+    availability: (row.availability as Availability) || 'available',
     createdAt: row.created_at,
   };
 }
@@ -339,58 +341,88 @@ export function AppProvider({ children }: { children: ReactNode }) {
     password: string,
     studentId: string,
     college: string,
-  ): Promise<{ error: string | null }> => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: name,
-          student_id: studentId,
-          college,
+  ): Promise<{ error: string | null; needsEmailConfirmation?: boolean }> => {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: name,
+            student_id: studentId,
+            college,
+          },
         },
-      },
-    });
+      });
 
-    if (error) {
-      return { error: error.message };
-    }
+      if (error) {
+        if (
+          error.message.includes('Failed to fetch') ||
+          error.message.includes('fetch') ||
+          error.message.includes('network')
+        ) {
+          return { error: 'Connection error. Please check your internet and try again.' };
+        }
+        return { error: error.message };
+      }
 
-    if (data.user && !data.session) {
-      // Email verification might be required
+      // If user exists but no session, email confirmation is required
+      if (data.user && !data.session) {
+        return { error: null, needsEmailConfirmation: true };
+      }
+
+      // If we have a session, update profile with student_id and college
+      if (data.user) {
+        await supabase
+          .from('profiles')
+          .update({ student_id: studentId, college })
+          .eq('id', data.user.id);
+      }
+
       return { error: null };
+    } catch (err: any) {
+      if (err?.message?.includes('Failed to fetch') || err?.message?.includes('fetch')) {
+        return { error: 'Connection error. Please check your internet and try again.' };
+      }
+      return { error: 'An unexpected error occurred during signup. Please try again.' };
     }
-
-    // If we have a session, update profile with student_id and college
-    if (data.user) {
-      await supabase
-        .from('profiles')
-        .update({ student_id: studentId, college })
-        .eq('id', data.user.id);
-    }
-
-    return { error: null };
   }, []);
 
   const login = useCallback(async (email: string, password: string): Promise<{ error: string | null }> => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (error) {
-      return { error: 'Invalid email or password.' };
-    }
-
-    if (data.user) {
-      const profile = await fetchUserProfile(data.user.id);
-      if (profile) {
-        setUser(profile);
-        fetchRequests(data.user.id);
+      if (error) {
+        // Distinguish network errors from invalid credentials
+        if (
+          error.message.includes('Failed to fetch') ||
+          error.message.includes('fetch') ||
+          error.message.includes('network') ||
+          error.message.includes('timeout')
+        ) {
+          return { error: 'Connection error. Please check your internet and try again.' };
+        }
+        return { error: 'Wrong email or password.' };
       }
-    }
 
-    return { error: null };
+      if (data.user) {
+        const profile = await fetchUserProfile(data.user.id);
+        if (profile) {
+          setUser(profile);
+          fetchRequests(data.user.id);
+        }
+      }
+
+      return { error: null };
+    } catch (err: any) {
+      if (err?.message?.includes('Failed to fetch') || err?.message?.includes('fetch')) {
+        return { error: 'Connection error. Please check your internet and try again.' };
+      }
+      return { error: 'An unexpected error occurred. Please try again.' };
+    }
   }, []);
 
   const logout = useCallback(() => {
@@ -540,6 +572,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }): Promise<{ error: string | null }> => {
     if (!user) return { error: 'Not logged in.' };
 
+    // Check item availability before creating the request
+    const { data: listing, error: fetchError } = await supabase
+      .from('listings')
+      .select('availability, status')
+      .eq('id', req.listingId)
+      .maybeSingle();
+
+    if (fetchError || !listing) {
+      return { error: 'This item could not be found.' };
+    }
+
+    if (listing.availability !== 'available') {
+      return { error: 'This item is currently unavailable.' };
+    }
+
     const { error } = await supabase.from('rent_requests').insert({
       listing_id: req.listingId,
       requester_id: user.id,
@@ -554,24 +601,108 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return { error: `Failed to send request: ${error.message}` };
     }
 
-    // Refresh requests
     fetchRequests(user.id);
 
     return { error: null };
   }, [user]);
 
-  const updateRequestStatus = useCallback(async (id: string, status: RequestStatus) => {
+  const updateRequestStatus = useCallback(async (id: string, status: RequestStatus): Promise<{ error: string | null }> => {
+    if (!user) return { error: 'Not logged in.' };
+
+    // Fetch the request to get listing_id
+    const { data: req, error: fetchErr } = await supabase
+      .from('rent_requests')
+      .select('id, listing_id, status')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (fetchErr || !req) {
+      return { error: 'Request not found.' };
+    }
+
+    // If accepting, check the item is still available (prevent double rental)
+    if (status === 'accepted') {
+      const { data: listing } = await supabase
+        .from('listings')
+        .select('availability')
+        .eq('id', req.listing_id)
+        .maybeSingle();
+
+      if (listing?.availability !== 'available') {
+        return { error: 'This item is currently unavailable.' };
+      }
+    }
+
+    // Update the request status
     const { error } = await supabase
       .from('rent_requests')
       .update({ status })
       .eq('id', id);
 
-    if (error) return;
-
-    if (user) {
-      fetchRequests(user.id);
+    if (error) {
+      return { error: `Failed to update request: ${error.message}` };
     }
-  }, [user, fetchRequests]);
+
+    // Update listing availability based on the new status
+    if (status === 'accepted') {
+      await supabase
+        .from('listings')
+        .update({ availability: 'unavailable' })
+        .eq('id', req.listing_id);
+    } else if (status === 'completed' || status === 'rejected') {
+      await supabase
+        .from('listings')
+        .update({ availability: 'available' })
+        .eq('id', req.listing_id);
+    }
+
+    fetchRequests(user.id);
+    fetchListings();
+
+    return { error: null };
+  }, [user, fetchRequests, fetchListings]);
+
+  const markReturned = useCallback(async (requestId: string): Promise<{ error: string | null }> => {
+    if (!user) return { error: 'Not logged in.' };
+
+    const { data: req, error: fetchErr } = await supabase
+      .from('rent_requests')
+      .select('id, listing_id, status, owner_id')
+      .eq('id', requestId)
+      .maybeSingle();
+
+    if (fetchErr || !req) {
+      return { error: 'Request not found.' };
+    }
+
+    if (req.owner_id !== user.id) {
+      return { error: 'Only the owner can mark an item as returned.' };
+    }
+
+    if (req.status !== 'accepted') {
+      return { error: 'Only accepted rentals can be marked as returned.' };
+    }
+
+    const { error: updateErr } = await supabase
+      .from('rent_requests')
+      .update({ status: 'completed' })
+      .eq('id', requestId);
+
+    if (updateErr) {
+      return { error: `Failed to update: ${updateErr.message}` };
+    }
+
+    // Set listing back to available
+    await supabase
+      .from('listings')
+      .update({ availability: 'available' })
+      .eq('id', req.listing_id);
+
+    fetchRequests(user.id);
+    fetchListings();
+
+    return { error: null };
+  }, [user, fetchRequests, fetchListings]);
 
   return (
     <AppContext.Provider
@@ -589,6 +720,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         requests,
         addRequest,
         updateRequestStatus,
+        markReturned,
         selectedItemId,
         setSelectedItemId,
         profilesMap,

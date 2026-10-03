@@ -81,11 +81,15 @@ export function Login() {
     }
 
     setLoading(true);
-    const result = await login(email.trim(), password);
-    setLoading(false);
-    if (result.error) {
-      setError(result.error);
+    try {
+      const result = await login(email.trim(), password);
+      if (result.error) {
+        setError(result.error);
+      }
+    } catch (err: any) {
+      setError('Connection error. Please check your internet and try again.');
     }
+    setLoading(false);
   };
 
   const handleSignup = async (e: React.FormEvent) => {
@@ -109,22 +113,29 @@ export function Login() {
     }
 
     setLoading(true);
-    const result = await signup(
-      name.trim(),
-      email.trim(),
-      password,
-      studentId.trim(),
-      college.trim() || 'IIT Bombay',
-    );
-    setLoading(false);
-
-    if (result.error) {
-      setError(result.error);
-    } else {
-      setSuccess('Account created successfully! You can now sign in.');
-      setMode('login');
-      setPassword('');
+    try {
+      const result = await signup(
+        name.trim(),
+        email.trim(),
+        password,
+        studentId.trim(),
+        college.trim() || 'IIT Bombay',
+      );
+      if (result.error) {
+        setError(result.error);
+      } else if (result.needsEmailConfirmation) {
+        setSuccess('Account created! Please check your email and click the confirmation link before signing in.');
+        setMode('login');
+        setPassword('');
+      } else {
+        setSuccess('Account created successfully! You can now sign in with your email and password.');
+        setMode('login');
+        setPassword('');
+      }
+    } catch (err: any) {
+      setError('Connection error. Please check your internet and try again.');
     }
+    setLoading(false);
   };
 
   const checks = passwordChecks(password);

@@ -3,7 +3,6 @@ import {
   Clock,
   CheckCircle2,
   XCircle,
-  Check,
 } from 'lucide-react';
 import { useApp } from '../store';
 import type { Page } from '../components/Navigation';
@@ -34,7 +33,7 @@ function formatDate(dateStr: string): string {
 }
 
 export function MyRentals({ navigate }: Props) {
-  const { requests, user, updateRequestStatus } = useApp();
+  const { requests, user } = useApp();
 
   const myRequests = requests.filter((r) => r.requesterId === user?.id);
 
@@ -69,15 +68,6 @@ export function MyRentals({ navigate }: Props) {
             {req.status}
           </div>
         </div>
-        {req.status === 'accepted' && (
-          <button
-            onClick={() => updateRequestStatus(req.id, 'completed')}
-            className="flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-emerald-700"
-          >
-            <Check className="h-3.5 w-3.5" />
-            Mark as Completed
-          </button>
-        )}
       </div>
     );
   };

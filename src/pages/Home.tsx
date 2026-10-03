@@ -10,6 +10,7 @@ import {
   Repeat,
   IndianRupee,
   Clock,
+  Loader2,
 } from 'lucide-react';
 import { useApp } from '../store';
 import { CATEGORIES } from '../data';
@@ -185,11 +186,21 @@ export function Home({ navigate }: Props) {
           View all →
         </button>
       </div>
-      <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-        {recommended.map((item) => (
-          <ItemCard key={item.id} item={item} onClick={() => handleItemClick(item.id)} />
-        ))}
-      </div>
+      {itemsLoading ? (
+        <div className="mb-8 flex items-center justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
+        </div>
+      ) : recommended.length > 0 ? (
+        <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          {recommended.map((item) => (
+            <ItemCard key={item.id} item={item} onClick={() => handleItemClick(item.id)} />
+          ))}
+        </div>
+      ) : (
+        <div className="mb-8 rounded-2xl border border-dashed border-gray-200 bg-white py-12 text-center">
+          <p className="text-sm text-gray-400">No items available yet. Be the first to list one!</p>
+        </div>
+      )}
 
       {/* Recently added items */}
       <div className="mb-4 flex items-center justify-between">
@@ -208,9 +219,15 @@ export function Home({ navigate }: Props) {
         </button>
       </div>
       <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-        {recentlyAdded.map((item) => (
-          <ItemCard key={item.id} item={item} onClick={() => handleItemClick(item.id)} />
-        ))}
+        {recentlyAdded.length > 0 ? (
+          recentlyAdded.map((item) => (
+            <ItemCard key={item.id} item={item} onClick={() => handleItemClick(item.id)} />
+          ))
+        ) : (
+          <div className="col-span-full rounded-2xl border border-dashed border-gray-200 bg-white py-12 text-center">
+            <p className="text-sm text-gray-400">No items have been listed yet.</p>
+          </div>
+        )}
       </div>
 
       {/* Sustainability mini-stats */}

@@ -10,6 +10,8 @@ import {
   CheckCircle2,
   Loader2,
   AlertCircle,
+  Trash2,
+  XCircle,
 } from 'lucide-react';
 import type { Item } from '../types';
 import { useApp } from '../store';
@@ -21,7 +23,7 @@ interface Props {
 }
 
 export function ItemDetails({ item, onBack }: Props) {
-  const { user, addRequest } = useApp();
+  const { user, addRequest, deleteListing } = useApp();
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -29,8 +31,12 @@ export function ItemDetails({ item, onBack }: Props) {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [message, setMessage] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const isOwnItem = item.ownerId === user?.id;
+  const isAvailable = item.availability === 'available';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,6 +57,19 @@ export function ItemDetails({ item, onBack }: Props) {
       setError(result.error);
     } else {
       setSubmitted(true);
+    }
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    setDeleteError(null);
+    const result = await deleteListing(item.id);
+    setDeleting(false);
+    if (result.success) {
+      setShowDeleteConfirm(false);
+      onBack();
+    } else {
+      setDeleteError(result.message ?? 'Unable to delete item.');
     }
   };
 
@@ -98,8 +117,15 @@ export function ItemDetails({ item, onBack }: Props) {
       </button>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-gray-100">
+        <div className="relative overflow-hidden rounded-2xl border border-gray-200 bg-gray-100">
           <img src={item.image} alt={item.name} className="aspect-[4/3] w-full object-cover" />
+          <div
+            className={`absolute right-3 top-3 rounded-full px-3 py-1 text-xs font-bold text-white shadow-sm ${
+              isAvailable ? 'bg-emerald-500' : 'bg-gray-500'
+            }`}
+          >
+            {isAvailable ? 'Available' : 'Unavailable'}
+          </div>
         </div>
 
         <div className="flex flex-col gap-4">
@@ -150,8 +176,31 @@ export function ItemDetails({ item, onBack }: Props) {
           )}
 
           {isOwnItem ? (
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-center text-sm font-medium text-emerald-700">
-              This is your listing
+            <>
+              <div
+                className={`rounded-xl border px-4 py-3 text-center text-sm font-medium ${
+                  isAvailable
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                    : 'border-gray-200 bg-gray-50 text-gray-600'
+                }`}
+              >
+                {isAvailable
+                  ? 'This item is available for rent'
+                  : 'This item is currently rented out'}
+              </div>
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                disabled={deleting}
+                className="flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 py-2.5 text-sm font-semibold text-red-600 transition-colors hover:bg-red-100 disabled:opacity-60"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete Listing
+              </button>
+            </>
+          ) : !isAvailable ? (
+            <div className="flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-500">
+              <XCircle className="h-4 w-4 text-gray-400" />
+              This item is currently unavailable
             </div>
           ) : showRequestForm ? (
             <form
@@ -237,6 +286,50 @@ export function ItemDetails({ item, onBack }: Props) {
           )}
         </div>
       </div>
+
+      {/* Delete confirmation */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+            {deleteError && (
+              <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
+                <p className="text-xs text-red-600">{deleteError}</p>
+              </div>
+            )}
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-red-50">
+              <Trash2 className="h-6 w-6 text-red-500" />
+            </div>
+            <h2 className="text-lg font-bold text-gray-900">Delete this item?</h2>
+            <p className="mt-2 text-sm text-gray-500">
+              Are you sure you want to permanently delete <span className="font-semibold text-gray-700">{item.name}</span>? This action cannot be undone.
+            </p>
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-600 py-2.5 text-sm font-semibold text-white shadow-md shadow-red-200 transition-all hover:bg-red-700 active:scale-[0.98] disabled:opacity-60"
+              >
+                {deleting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  'Yes, Delete'
+                )}
+              </button>
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={deleting}
+                className="rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
