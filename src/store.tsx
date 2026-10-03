@@ -1324,7 +1324,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
       status: 'pending',
     });
     if (error) return { error: `Failed to send request: ${error.message}` };
+
+    const { data: listingInfo } = await supabase
+      .from('listings')
+      .select('title')
+      .eq('id', req.listingId)
+      .maybeSingle();
+    const listingTitle = listingInfo?.title || 'your item';
+    const duration = req.startDate && req.endDate
+      ? `${req.startDate} to ${req.endDate}`
+      : 'See request details';
+    await supabase.from('notifications').insert({
+      user_id: req.ownerId,
+      actor_id: user.id,
+      type: 'new_request',
+      title: 'New rental request',
+      body: `${user.fullName} requested to borrow "${listingTitle}". Duration: ${duration}.`,
+      listing_id: req.listingId,
+    });
+
     fetchRequests(user.id);
+    fetchNotifications();
     return { error: null };
   }, [user]);
 
@@ -1333,6 +1353,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (status === 'accepted') {
       const { data, error } = await supabase.rpc('accept_rental', { p_request_id: id });
       if (error) return { error: 'Failed to accept request.' };
+      if (data && data.error) return { error: data.error as string };
+      fetchRequests(user.id);
+      fetchListings();
+      fetchNotifications();
+      return { error: null };
+    }
+    if (status === 'rejected') {
+      const { data, error: rpcError } = await supabase.rpc('reject_rental', { p_request_id: id });
+      if (rpcError) return { error: 'Failed to reject request.' };
       if (data && data.error) return { error: data.error as string };
       fetchRequests(user.id);
       fetchListings();
@@ -1351,9 +1380,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .update({ status })
       .eq('id', id);
     if (error) return { error: `Failed to update request: ${error.message}` };
-    if (status === 'rejected') {
-      await supabase.from('listings').update({ availability: 'available' }).eq('id', req.listing_id);
-    }
     fetchRequests(user.id);
     fetchListings();
     fetchNotifications();

@@ -24,6 +24,20 @@ function validateEmail(email: string): string | null {
   return null;
 }
 
+function validateCollegeId(studentId: string, email: string): string | null {
+  if (!studentId.trim()) return 'College ID is required.';
+  const id = studentId.trim().toUpperCase();
+  if (!/^[RSON][0-9]{6}$/.test(id)) {
+    return 'College ID must be 7 characters: R/S/O/N followed by 6 digits (e.g. R123456).';
+  }
+  const emailLocalPart = email.trim().split('@')[0].toUpperCase();
+  const expectedId = emailLocalPart.substring(0, 7);
+  if (id !== expectedId) {
+    return 'College ID must match the first 7 characters of your email address.';
+  }
+  return null;
+}
+
 function validatePassword(password: string): string | null {
   if (!password) return 'Password is required.';
   if (password.length < 8) return 'Password must be at least 8 characters.';
@@ -106,7 +120,11 @@ export function Login() {
     if (!name.trim()) errors.name = 'Student name is required.';
     const emailErr = validateEmail(email);
     if (emailErr) errors.email = emailErr;
-    if (!studentId.trim()) errors.studentId = 'Student ID is required.';
+    if (!studentId.trim()) errors.studentId = 'College ID is required.';
+    else {
+      const idErr = validateCollegeId(studentId, email);
+      if (idErr) errors.studentId = idErr;
+    }
     const pwErr = validatePassword(password);
     if (pwErr) errors.password = pwErr;
     if (!college.trim()) errors.college = 'College name is required.';
@@ -395,14 +413,14 @@ export function Login() {
                 {fieldErrors.email && <p className="mt-1 text-xs text-red-500">{fieldErrors.email}</p>}
               </div>
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700">Student ID</label>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700">College ID</label>
                 <div className="relative">
                   <IdCard className="absolute left-3 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-gray-400" />
                   <input
                     type="text"
                     value={studentId}
                     onChange={(e) => { setStudentId(e.target.value); if (fieldErrors.studentId) setFieldErrors((p) => ({ ...p, studentId: '' })); }}
-                    placeholder="e.g. CS21B042"
+                    placeholder="e.g. R123456"
                     className={`w-full rounded-xl border bg-gray-50 py-2.5 pl-10 pr-4 text-sm text-gray-900 outline-none transition-colors focus:bg-white focus:ring-2 ${fieldErrors.studentId ? 'border-red-300 focus:border-red-400 focus:ring-red-100' : 'border-gray-200 focus:border-emerald-400 focus:ring-emerald-100'}`}
                   />
                 </div>
