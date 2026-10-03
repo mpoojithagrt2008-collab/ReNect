@@ -49,6 +49,19 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | null>(null);
 
+function isNetworkError(err: any): boolean {
+  if (!err) return false;
+  const msg = (err.message || '').toLowerCase();
+  return (
+    msg.includes('failed to fetch') ||
+    msg.includes('networkerror') ||
+    msg.includes('network request failed') ||
+    msg.includes('err_network') ||
+    msg.includes('timeout') ||
+    msg.includes('load failed')
+  );
+}
+
 function parseItem(row: any, ownerName: string, ownerVerified: boolean): Item {
   return {
     id: row.id,
@@ -274,12 +287,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setAuthLoading(false);
       } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         (async () => {
-          const profile = await fetchUserProfile(session.user.id);
-          if (!mounted) return;
-          if (profile) {
-            setUser(profile);
-            fetchRequests(session.user.id);
+          let profile = await fetchUserProfile(session.user.id);
+          if (!profile) {
+            // Fallback: build profile from auth metadata if the profiles row
+            // doesn't exist yet (trigger delay or failure)
+            const fallbackName =
+              (session.user.user_metadata?.full_name as string) ||
+              session.user.email?.split('@')[0] ||
+              'User';
+            profile = {
+              id: session.user.id,
+              fullName: fallbackName,
+              email: session.user.email || '',
+              studentId: (session.user.user_metadata?.student_id as string) || '',
+              college: (session.user.user_metadata?.college as string) || '',
+            };
           }
+          if (!mounted) return;
+          setUser(profile);
+          fetchRequests(session.user.id);
           setAuthLoading(false);
         })();
       }
@@ -342,9 +368,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     studentId: string,
     college: string,
   ): Promise<{ error: string | null; needsEmailConfirmation?: boolean }> => {
+    const normalizedEmail = email.trim().toLowerCase();
     try {
       const { data, error } = await supabase.auth.signUp({
-        email,
+        email: normalizedEmail,
         password,
         options: {
           data: {
@@ -356,12 +383,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       });
 
       if (error) {
-        if (
-          error.message.includes('Failed to fetch') ||
-          error.message.includes('fetch') ||
-          error.message.includes('network')
-        ) {
-          return { error: 'Connection error. Please check your internet and try again.' };
+        if (import.meta.env.DEV) console.error('[signup] Supabase error:', error.message);
+        if (isNetworkError(error)) {
+          return { error: 'Unable to connect to the server. Please check your internet connection and try again.' };
         }
         return { error: error.message };
       }
@@ -381,45 +405,58 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       return { error: null };
     } catch (err: any) {
-      if (err?.message?.includes('Failed to fetch') || err?.message?.includes('fetch')) {
-        return { error: 'Connection error. Please check your internet and try again.' };
+      if (import.meta.env.DEV) console.error('[signup] unexpected error:', err);
+      if (isNetworkError(err)) {
+        return { error: 'Unable to connect to the server. Please check your internet connection and try again.' };
       }
       return { error: 'An unexpected error occurred during signup. Please try again.' };
     }
   }, []);
 
   const login = useCallback(async (email: string, password: string): Promise<{ error: string | null }> => {
+    const normalizedEmail = email.trim().toLowerCase();
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: normalizedEmail,
         password,
       });
 
       if (error) {
-        // Distinguish network errors from invalid credentials
-        if (
-          error.message.includes('Failed to fetch') ||
-          error.message.includes('fetch') ||
-          error.message.includes('network') ||
-          error.message.includes('timeout')
-        ) {
-          return { error: 'Connection error. Please check your internet and try again.' };
+        if (import.meta.env.DEV) console.error('[login] Supabase error:', error.message, '(code:', error.status, ')');
+        if (isNetworkError(error)) {
+          return { error: 'Unable to connect to the server. Please check your internet connection and try again.' };
         }
-        return { error: 'Wrong email or password.' };
+        return { error: 'Invalid email or password.' };
       }
 
       if (data.user) {
-        const profile = await fetchUserProfile(data.user.id);
-        if (profile) {
-          setUser(profile);
-          fetchRequests(data.user.id);
+        // Try to fetch the profile; if it doesn't exist yet, create a fallback
+        // profile from auth user metadata so login always succeeds
+        let profile = await fetchUserProfile(data.user.id);
+        if (!profile) {
+          // Profile row may not exist yet (trigger delay or failure).
+          // Build a profile from the auth user's metadata so the user isn't stuck.
+          const fallbackName =
+            (data.user.user_metadata?.full_name as string) ||
+            data.user.email?.split('@')[0] ||
+            'User';
+          profile = {
+            id: data.user.id,
+            fullName: fallbackName,
+            email: data.user.email || normalizedEmail,
+            studentId: (data.user.user_metadata?.student_id as string) || '',
+            college: (data.user.user_metadata?.college as string) || '',
+          };
         }
+        setUser(profile);
+        fetchRequests(data.user.id);
       }
 
       return { error: null };
     } catch (err: any) {
-      if (err?.message?.includes('Failed to fetch') || err?.message?.includes('fetch')) {
-        return { error: 'Connection error. Please check your internet and try again.' };
+      if (import.meta.env.DEV) console.error('[login] unexpected error:', err);
+      if (isNetworkError(err)) {
+        return { error: 'Unable to connect to the server. Please check your internet connection and try again.' };
       }
       return { error: 'An unexpected error occurred. Please try again.' };
     }

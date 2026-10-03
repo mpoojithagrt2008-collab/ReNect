@@ -87,7 +87,7 @@ export function Login() {
         setError(result.error);
       }
     } catch (err: any) {
-      setError('Connection error. Please check your internet and try again.');
+      setError('Unable to connect to the server. Please check your internet connection and try again.');
     }
     setLoading(false);
   };
@@ -133,7 +133,7 @@ export function Login() {
         setPassword('');
       }
     } catch (err: any) {
-      setError('Connection error. Please check your internet and try again.');
+      setError('Unable to connect to the server. Please check your internet connection and try again.');
     }
     setLoading(false);
   };
