@@ -15,6 +15,7 @@ import { CATEGORIES } from '../data';
 import { ItemCard } from '../components/ItemCard';
 import type { Category } from '../types';
 import type { Page } from '../components/Navigation';
+import { Heart } from 'lucide-react';
 
 interface Props {
   navigate: (p: Page) => void;
@@ -41,32 +42,33 @@ const CATEGORY_GRADIENTS: Record<string, string> = {
 };
 
 export function Home({ navigate }: Props) {
-  const { user, items, itemsLoading, setSelectedItemId } = useApp();
+  const { user, exploreItems, items, itemsLoading, setSelectedItemId, favoriteIds, toggleFavorite, ratingsMap } = useApp();
   const [search, setSearch] = useState('');
 
   const recommended = useMemo(() => {
     const userCats = items
       .filter((i) => i.ownerId === user?.id)
       .map((i) => i.category);
-    const scored = items
-      .filter((i) => i.ownerId !== user?.id)
+    const scored = exploreItems
       .map((i) => ({
         item: i,
         score: (userCats.includes(i.category) ? 2 : 0) + (i.condition === 'Like New' || i.condition === 'New' ? 1 : 0),
       }))
       .sort((a, b) => b.score - a.score);
     return scored.slice(0, 4).map((s) => s.item);
-  }, [items]);
+  }, [exploreItems, items]);
 
-  const recentlyAdded = useMemo(() => items.slice(0, 4), [items]);
+  const recentlyAdded = useMemo(() => exploreItems.slice(0, 4), [exploreItems]);
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return items.slice(0, 8);
-    return items.filter((i) =>
-      i.name.toLowerCase().includes(search.toLowerCase()) ||
-      i.description.toLowerCase().includes(search.toLowerCase()),
+    if (!search.trim()) return exploreItems.slice(0, 8);
+    const q = search.toLowerCase();
+    return exploreItems.filter((i) =>
+      i.name.toLowerCase().includes(q) ||
+      i.description.toLowerCase().includes(q) ||
+      i.category.toLowerCase().includes(q),
     );
-  }, [items, search]);
+  }, [exploreItems, search]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,7 +124,7 @@ export function Home({ navigate }: Props) {
         <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-sm">
           <span className="flex items-center gap-1.5 text-emerald-50/90">
             <Package className="h-4 w-4" />
-            {items.length} items available
+            {exploreItems.length} items available
           </span>
           <span className="flex items-center gap-1.5 text-emerald-50/90">
             <Repeat className="h-4 w-4" />
@@ -138,7 +140,7 @@ export function Home({ navigate }: Props) {
             <TrendingUp className="h-5 w-5 text-emerald-600" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-gray-900">{items.length} items available</p>
+            <p className="text-sm font-semibold text-gray-900">{exploreItems.length} items available</p>
             <p className="text-xs text-gray-500">Across {CATEGORIES.length} categories</p>
           </div>
         </div>
@@ -191,7 +193,7 @@ export function Home({ navigate }: Props) {
       ) : recommended.length > 0 ? (
         <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           {recommended.map((item) => (
-            <ItemCard key={item.id} item={item} onClick={() => handleItemClick(item.id)} />
+            <ItemCard key={item.id} item={item} onClick={() => handleItemClick(item.id)} isFavorite={favoriteIds.has(item.id)} onToggleFavorite={() => toggleFavorite(item.id)} rating={ratingsMap[item.id] || null} />
           ))}
         </div>
       ) : (
@@ -219,7 +221,7 @@ export function Home({ navigate }: Props) {
       <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
         {recentlyAdded.length > 0 ? (
           recentlyAdded.map((item) => (
-            <ItemCard key={item.id} item={item} onClick={() => handleItemClick(item.id)} />
+            <ItemCard key={item.id} item={item} onClick={() => handleItemClick(item.id)} isFavorite={favoriteIds.has(item.id)} onToggleFavorite={() => toggleFavorite(item.id)} rating={ratingsMap[item.id] || null} />
           ))
         ) : (
           <div className="col-span-full rounded-2xl border border-dashed border-gray-200 bg-white py-12 text-center">
@@ -236,7 +238,7 @@ export function Home({ navigate }: Props) {
           </h2>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {filtered.map((item) => (
-              <ItemCard key={item.id} item={item} onClick={() => handleItemClick(item.id)} />
+              <ItemCard key={item.id} item={item} onClick={() => handleItemClick(item.id)} isFavorite={favoriteIds.has(item.id)} onToggleFavorite={() => toggleFavorite(item.id)} rating={ratingsMap[item.id] || null} />
             ))}
           </div>
           {filtered.length === 0 && (

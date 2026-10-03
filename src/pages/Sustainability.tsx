@@ -52,7 +52,7 @@ export function Sustainability({ navigate }: Props) {
           Sustainability
         </div>
         <h1 className="mt-1.5 text-2xl font-bold tracking-tight md:text-3xl">
-          Campus Reuse Impact
+          ReNect Reuse Impact
         </h1>
         <p className="mt-1.5 text-sm text-emerald-50/80 md:text-base">
           Every item borrowed is one less item bought. Together, the campus community is reducing waste and saving money.

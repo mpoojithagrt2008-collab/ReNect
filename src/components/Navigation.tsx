@@ -8,10 +8,11 @@ import {
   LogOut,
   MessageCircle,
   Bell,
+  Heart,
 } from 'lucide-react';
 import { useApp } from '../store';
 
-export type Page = 'home' | 'explore' | 'rentals' | 'items' | 'messages' | 'notifications' | 'profile';
+export type Page = 'home' | 'explore' | 'rentals' | 'items' | 'messages' | 'notifications' | 'favorites' | 'profile';
 
 interface Props {
   current: Page;
@@ -21,9 +22,10 @@ interface Props {
 const NAV_ITEMS: { page: Page; label: string; icon: typeof Home }[] = [
   { page: 'home', label: 'Home', icon: Home },
   { page: 'explore', label: 'Explore', icon: Compass },
-  { page: 'rentals', label: 'My Rentals', icon: CalendarCheck },
+  { page: 'rentals', label: 'Rentals', icon: CalendarCheck },
   { page: 'items', label: 'My Items', icon: Package },
   { page: 'messages', label: 'Messages', icon: MessageCircle },
+  { page: 'favorites', label: 'Favorites', icon: Heart },
   { page: 'notifications', label: 'Alerts', icon: Bell },
   { page: 'profile', label: 'Profile', icon: User },
 ];
@@ -55,7 +57,7 @@ export function Navigation({ current, navigate }: Props) {
               <Leaf className="h-5 w-5 text-white" />
             </div>
             <span className="text-lg font-bold tracking-tight text-gray-900">
-              Campus<span className="text-emerald-600">Loop</span>
+              Re<span className="text-emerald-600">Nect</span>
             </span>
           </button>
 
@@ -67,7 +69,7 @@ export function Navigation({ current, navigate }: Props) {
                 <button
                   key={item.page}
                   onClick={() => navigate(item.page)}
-                  className={`relative flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium transition-all ${
+                  className={`relative flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-all ${
                     active
                       ? 'bg-emerald-50 text-emerald-700'
                       : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
@@ -112,7 +114,7 @@ export function Navigation({ current, navigate }: Props) {
               <Leaf className="h-4.5 w-4.5 text-white" />
             </div>
             <span className="text-base font-bold tracking-tight text-gray-900">
-              Campus<span className="text-emerald-600">Loop</span>
+              Re<span className="text-emerald-600">Nect</span>
             </span>
           </button>
           <div className="flex items-center gap-2">
@@ -139,7 +141,7 @@ export function Navigation({ current, navigate }: Props) {
 
       {/* Mobile bottom nav */}
       <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200 bg-white/95 backdrop-blur-md md:hidden">
-        <div className="flex items-center justify-around px-2 py-1.5">
+        <div className="flex items-center justify-around px-1 py-1.5">
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon;
             const active = current === item.page;
@@ -152,9 +154,9 @@ export function Navigation({ current, navigate }: Props) {
                 }`}
               >
                 <Icon className={`h-5 w-5 ${active ? 'scale-110' : ''} transition-transform`} />
-                <span className="text-[10px] font-medium">{item.label}</span>
+                <span className="text-[9px] font-medium">{item.label}</span>
                 {item.page === 'notifications' && unreadCount > 0 && (
-                  <span className="absolute right-1 top-0 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
+                  <span className="absolute right-0.5 top-0 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
                     {unreadCount > 9 ? '9+' : unreadCount}
                   </span>
                 )}

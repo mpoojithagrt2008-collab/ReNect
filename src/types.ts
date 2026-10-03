@@ -23,6 +23,7 @@ export interface Item {
   image: string;
   ownerId: string;
   ownerName: string;
+  ownerStudentId: string;
   verified: boolean;
   availability: Availability;
   createdAt: string;
@@ -61,19 +62,6 @@ export interface ChatMessage {
   timestamp: string;
 }
 
-export interface Conversation {
-  id: string;
-  requestId: string;
-  itemId: string;
-  itemName: string;
-  itemImage: string;
-  ownerId: string;
-  ownerName: string;
-  borrowerId: string;
-  borrowerName: string;
-  messages: ChatMessage[];
-}
-
 export interface AppNotification {
   id: string;
   userId: string;
@@ -85,4 +73,26 @@ export interface AppNotification {
   requestId: string | null;
   read: boolean;
   createdAt: string;
+}
+
+export interface Favorite {
+  id: string;
+  listingId: string;
+  createdAt: string;
+}
+
+export interface Review {
+  id: string;
+  requestId: string;
+  listingId: string;
+  reviewerId: string;
+  reviewerName: string;
+  rating: number;
+  feedback: string;
+  createdAt: string;
+}
+
+export interface ListingRating {
+  averageRating: number;
+  reviewCount: number;
 }

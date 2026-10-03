@@ -6,26 +6,27 @@ import { ItemCard } from '../components/ItemCard';
 import { ItemDetails } from './ItemDetails';
 
 export function Explore() {
-  const { items, itemsLoading, selectedItemId, setSelectedItemId } = useApp();
+  const { exploreItems, itemsLoading, selectedItemId, setSelectedItemId, favoriteIds, toggleFavorite, ratingsMap, fetchRating } = useApp();
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<string>('All');
 
   const selectedItem = useMemo(
-    () => items.find((i) => i.id === selectedItemId) ?? null,
-    [items, selectedItemId],
+    () => exploreItems.find((i) => i.id === selectedItemId) ?? null,
+    [exploreItems, selectedItemId],
   );
 
   const filtered = useMemo(() => {
-    return items.filter((item) => {
+    const q = search.trim().toLowerCase();
+    return exploreItems.filter((item) => {
       const matchesSearch =
-        !search.trim() ||
-        item.name.toLowerCase().includes(search.toLowerCase()) ||
-        item.description.toLowerCase().includes(search.toLowerCase());
-      const matchesCategory =
-        activeCategory === 'All' || item.category === activeCategory;
+        !q ||
+        item.name.toLowerCase().includes(q) ||
+        item.description.toLowerCase().includes(q) ||
+        item.category.toLowerCase().includes(q);
+      const matchesCategory = activeCategory === 'All' || item.category === activeCategory;
       return matchesSearch && matchesCategory;
     });
-  }, [items, search, activeCategory]);
+  }, [exploreItems, search, activeCategory]);
 
   if (selectedItem) {
     return <ItemDetails item={selectedItem} onBack={() => setSelectedItemId(null)} />;
@@ -83,6 +84,9 @@ export function Explore() {
                   key={item.id}
                   item={item}
                   onClick={() => setSelectedItemId(item.id)}
+                  isFavorite={favoriteIds.has(item.id)}
+                  onToggleFavorite={() => toggleFavorite(item.id)}
+                  rating={ratingsMap[item.id] || null}
                 />
               ))}
             </div>
@@ -92,7 +96,7 @@ export function Explore() {
                 <Package className="h-8 w-8 text-gray-300" />
               </div>
               <p className="text-gray-400">
-                {items.length === 0
+                {exploreItems.length === 0
                   ? 'No items have been listed yet. Be the first!'
                   : 'No items found. Try a different search or category.'}
               </p>

@@ -9,7 +9,7 @@ import {
 } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
-import type { Item, BorrowRequest, UserProfile, RequestStatus, Availability, AppNotification, ChatMessage } from './types';
+import type { Item, BorrowRequest, UserProfile, RequestStatus, Availability, AppNotification, ChatMessage, Favorite, Review, ListingRating } from './types';
 import { PLACEHOLDER_IMAGES } from './data';
 import type { Category, Condition } from './types';
 
@@ -17,10 +17,13 @@ interface AppContextType {
   user: UserProfile | null;
   authLoading: boolean;
   signup: (name: string, email: string, password: string, studentId: string, college: string) => Promise<{ error: string | null; needsEmailConfirmation?: boolean }>;
+  verifyOtp: (email: string, token: string) => Promise<{ error: string | null }>;
+  resendOtp: (email: string) => Promise<{ error: string | null }>;
   login: (email: string, password: string) => Promise<{ error: string | null }>;
   logout: () => void;
   deleteAccount: () => Promise<{ error: string | null }>;
   items: Item[];
+  exploreItems: Item[];
   itemsLoading: boolean;
   addListing: (data: {
     name: string;
@@ -57,6 +60,17 @@ interface AppContextType {
   sendMessage: (requestId: string, receiverId: string, text: string) => Promise<{ error: string | null }>;
   updateAvatar: (file: File) => Promise<{ error: string | null }>;
   removeAvatar: () => Promise<{ error: string | null }>;
+  favorites: Favorite[];
+  favoriteIds: Set<string>;
+  toggleFavorite: (listingId: string) => Promise<void>;
+  fetchFavorites: () => Promise<void>;
+  ratingsMap: Record<string, ListingRating>;
+  fetchRating: (listingId: string) => Promise<void>;
+  reviews: Review[];
+  fetchReviews: (listingId: string) => Promise<void>;
+  submitReview: (requestId: string, listingId: string, rating: number, feedback: string) => Promise<{ error: string | null }>;
+  reviewedRequestIds: Set<string>;
+  fetchReviewedRequestIds: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -74,7 +88,7 @@ function isNetworkError(err: any): boolean {
   );
 }
 
-function parseItem(row: any, ownerName: string, ownerVerified: boolean): Item {
+function parseItem(row: any, ownerName: string, ownerVerified: boolean, ownerStudentId: string): Item {
   return {
     id: row.id,
     name: row.title,
@@ -86,6 +100,7 @@ function parseItem(row: any, ownerName: string, ownerVerified: boolean): Item {
     image: row.image_url || PLACEHOLDER_IMAGES[(row.category as Category) || 'Other'],
     ownerId: row.owner_id,
     ownerName,
+    ownerStudentId,
     verified: ownerVerified,
     availability: (row.availability as Availability) || 'available',
     createdAt: row.created_at,
@@ -132,25 +147,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [activeChatRequestId, setActiveChatRequestId] = useState<string | null>(null);
+  const [favorites, setFavorites] = useState<Favorite[]>([]);
+  const [ratingsMap, setRatingsMap] = useState<Record<string, ListingRating>>({});
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviewedRequestIds, setReviewedRequestIds] = useState<Set<string>>(new Set());
   const sessionRef = useRef<Session | null>(null);
+  const activeChatRef = useRef<string | null>(null);
+  const messagesChannelRef = useRef<any>(null);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
+  const favoriteIds = new Set(favorites.map((f) => f.listingId));
 
-  // Fetch profiles for a list of user IDs and merge into profilesMap
-  const fetchProfiles = useCallback(async (userIds: string[]) => {
-    const uniqueIds = [...new Set(userIds)].filter((id) => id && !profilesMap[id]);
-    if (uniqueIds.length === 0) return;
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id, full_name, email, student_id, college, avatar_url')
-      .in('id', uniqueIds);
-    if (error || !data) return;
-    const newMap: Record<string, UserProfile> = {};
-    for (const p of data) {
-      newMap[p.id] = parseProfile(p);
-    }
-    setProfilesMap((prev) => ({ ...prev, ...newMap }));
-  }, [profilesMap]);
+  // Explore items = all items except the logged-in user's own listings
+  const exploreItems = items.filter((i) => i.ownerId !== user?.id);
 
   // Fetch all active listings
   const fetchListings = useCallback(async () => {
@@ -168,37 +177,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const ownerIds = data.map((r: any) => r.owner_id);
     const missingIds = [...new Set(ownerIds)].filter((id: string) => !profilesMap[id]);
+    let currentProfilesMap = profilesMap;
     if (missingIds.length > 0) {
       const { data: pData } = await supabase
         .from('profiles')
         .select('id, full_name, email, student_id, college, avatar_url')
         .in('id', missingIds);
       if (pData) {
-        const newMap: Record<string, UserProfile> = { ...profilesMap };
+        currentProfilesMap = { ...profilesMap };
         for (const p of pData) {
-          newMap[p.id] = parseProfile(p);
+          currentProfilesMap[p.id] = parseProfile(p);
         }
-        setProfilesMap(newMap);
-        const parsed = data.map((row: any) => {
-          const profile = newMap[row.owner_id];
-          return parseItem(row, profile?.fullName || 'Unknown', !!profile);
-        });
-        setItems(parsed);
-      } else {
-        const parsed = data.map((row: any) => parseItem(row, 'Unknown', false));
-        setItems(parsed);
+        setProfilesMap(currentProfilesMap);
       }
-    } else {
-      const parsed = data.map((row: any) => {
-        const profile = profilesMap[row.owner_id];
-        return parseItem(row, profile?.fullName || 'Unknown', !!profile);
-      });
-      setItems(parsed);
     }
+
+    const parsed = data.map((row: any) => {
+      const profile = currentProfilesMap[row.owner_id];
+      return parseItem(row, profile?.fullName || 'Unknown', !!profile, profile?.studentId || '');
+    });
+    setItems(parsed);
     setItemsLoading(false);
   }, [profilesMap]);
 
-  // Fetch requests for current user (as requester or owner)
+  // Fetch requests for current user
   const fetchRequests = useCallback(async (userId: string) => {
     const { data, error } = await supabase
       .from('rent_requests')
@@ -236,12 +238,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         .select('id, full_name, email, student_id, college, avatar_url')
         .in('id', missingProfileIds);
       if (pData) {
-        const newMap = { ...profilesMap };
+        currentProfilesMap = { ...profilesMap };
         for (const p of pData) {
-          newMap[p.id] = parseProfile(p);
+          currentProfilesMap[p.id] = parseProfile(p);
         }
-        currentProfilesMap = newMap;
-        setProfilesMap(newMap);
+        setProfilesMap(currentProfilesMap);
       }
     }
 
@@ -260,7 +261,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setRequests(parsed);
   }, [profilesMap]);
 
-  // Fetch notifications for current user
+  // Fetch notifications
   const fetchNotifications = useCallback(async () => {
     const userId = sessionRef.current?.user?.id;
     if (!userId) return;
@@ -285,7 +286,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     })));
   }, []);
 
-  // Mark a single notification as read
   const markNotificationRead = useCallback(async (id: string) => {
     const { error } = await supabase
       .from('notifications')
@@ -296,7 +296,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Mark all notifications as read
   const markAllNotificationsRead = useCallback(async () => {
     const userId = sessionRef.current?.user?.id;
     if (!userId) return;
@@ -310,7 +309,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Fetch messages for a request
+  // Fetch messages
   const fetchMessages = useCallback(async (requestId: string) => {
     const { data, error } = await supabase
       .from('messages')
@@ -350,7 +349,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return { error: null };
   }, [user]);
 
-  // Upload avatar
+  // Avatar upload
   const updateAvatar = useCallback(async (file: File): Promise<{ error: string | null }> => {
     if (!user) return { error: 'Not logged in.' };
     const fileExt = file.name.split('.').pop();
@@ -358,10 +357,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const { error: uploadError } = await supabase.storage
       .from('avatars')
       .upload(fileName, file);
-    if (uploadError) {
-      if (import.meta.env.DEV) console.error('[updateAvatar] upload error:', uploadError.message);
-      return { error: 'Failed to upload image.' };
-    }
+    if (uploadError) return { error: 'Failed to upload image.' };
     const { data: urlData } = supabase.storage
       .from('avatars')
       .getPublicUrl(fileName);
@@ -371,9 +367,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .from('profiles')
       .update({ avatar_url: publicUrl })
       .eq('id', user.id);
-    if (updateError) {
-      return { error: 'Failed to update profile.' };
-    }
+    if (updateError) return { error: 'Failed to update profile.' };
     setUser({ ...user, avatarUrl: publicUrl });
     setProfilesMap((prev) => ({
       ...prev,
@@ -382,7 +376,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return { error: null };
   }, [user]);
 
-  // Remove avatar
   const removeAvatar = useCallback(async (): Promise<{ error: string | null }> => {
     if (!user || !user.avatarUrl) return { error: null };
     try {
@@ -392,7 +385,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         await supabase.storage.from('avatars').remove([pathMatch[1]]);
       }
     } catch {
-      // ignore storage cleanup errors
+      // ignore
     }
     const { error } = await supabase
       .from('profiles')
@@ -407,11 +400,135 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return { error: null };
   }, [user]);
 
-  // Auth state + initial data loading
+  // Favorites
+  const fetchFavorites = useCallback(async () => {
+    const userId = sessionRef.current?.user?.id;
+    if (!userId) return;
+    const { data, error } = await supabase
+      .from('favorites')
+      .select('id, listing_id, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    if (error || !data) return;
+    setFavorites(data.map((f: any) => ({
+      id: f.id,
+      listingId: f.listing_id,
+      createdAt: f.created_at,
+    })));
+  }, []);
+
+  const toggleFavorite = useCallback(async (listingId: string) => {
+    const userId = sessionRef.current?.user?.id;
+    if (!userId) return;
+    const existing = favorites.find((f) => f.listingId === listingId);
+    if (existing) {
+      await supabase.from('favorites').delete().eq('id', existing.id);
+      setFavorites((prev) => prev.filter((f) => f.id !== existing.id));
+    } else {
+      const { data, error } = await supabase.from('favorites').insert({
+        user_id: userId,
+        listing_id: listingId,
+      }).select('id, listing_id, created_at').maybeSingle();
+      if (!error && data) {
+        setFavorites((prev) => [...prev, {
+          id: data.id,
+          listingId: data.listing_id,
+          createdAt: data.created_at,
+        }]);
+      }
+    }
+  }, [favorites]);
+
+  // Ratings
+  const fetchRating = useCallback(async (listingId: string) => {
+    const { data, error } = await supabase
+      .from('reviews')
+      .select('rating')
+      .eq('listing_id', listingId);
+    if (error || !data) return;
+    if (data.length === 0) {
+      setRatingsMap((prev) => ({ ...prev, [listingId]: { averageRating: 0, reviewCount: 0 } }));
+      return;
+    }
+    const avg = data.reduce((sum: number, r: any) => sum + r.rating, 0) / data.length;
+    setRatingsMap((prev) => ({ ...prev, [listingId]: { averageRating: avg, reviewCount: data.length } }));
+  }, []);
+
+  // Reviews
+  const fetchReviews = useCallback(async (listingId: string) => {
+    const { data, error } = await supabase
+      .from('reviews')
+      .select('id, request_id, listing_id, reviewer_id, rating, feedback, created_at')
+      .eq('listing_id', listingId)
+      .order('created_at', { ascending: false });
+    if (error || !data) {
+      setReviews([]);
+      return;
+    }
+    const reviewerIds = [...new Set(data.map((r: any) => r.reviewer_id))];
+    const missingIds = reviewerIds.filter((id: string) => !profilesMap[id]);
+    let currentProfilesMap = profilesMap;
+    if (missingIds.length > 0) {
+      const { data: pData } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', missingIds);
+      if (pData) {
+        currentProfilesMap = { ...profilesMap };
+        for (const p of pData) {
+          currentProfilesMap[p.id] = { ...currentProfilesMap[p.id], ...parseProfile(p) };
+        }
+      }
+    }
+    const parsed: Review[] = data.map((r: any) => ({
+      id: r.id,
+      requestId: r.request_id,
+      listingId: r.listing_id,
+      reviewerId: r.reviewer_id,
+      reviewerName: currentProfilesMap[r.reviewer_id]?.fullName || 'Anonymous',
+      rating: r.rating,
+      feedback: r.feedback || '',
+      createdAt: r.created_at,
+    }));
+    setReviews(parsed);
+  }, [profilesMap]);
+
+  const submitReview = useCallback(async (requestId: string, listingId: string, rating: number, feedback: string): Promise<{ error: string | null }> => {
+    if (!user) return { error: 'Not logged in.' };
+    const { error } = await supabase.from('reviews').insert({
+      request_id: requestId,
+      listing_id: listingId,
+      reviewer_id: user.id,
+      rating,
+      feedback,
+    });
+    if (error) {
+      if (error.code === '23505') {
+        return { error: 'You have already reviewed this rental.' };
+      }
+      return { error: 'Failed to submit review.' };
+    }
+    setReviewedRequestIds((prev) => new Set([...prev, requestId]));
+    fetchRating(listingId);
+    fetchReviews(listingId);
+    return { error: null };
+  }, [user, fetchRating, fetchReviews]);
+
+  const fetchReviewedRequestIds = useCallback(async () => {
+    const userId = sessionRef.current?.user?.id;
+    if (!userId) return;
+    const { data, error } = await supabase
+      .from('reviews')
+      .select('request_id')
+      .eq('reviewer_id', userId);
+    if (error || !data) return;
+    setReviewedRequestIds(new Set(data.map((r: any) => r.request_id)));
+  }, []);
+
+  // Auth state + initial data
   useEffect(() => {
     let mounted = true;
 
-    // Check existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!mounted) return;
       sessionRef.current = session;
@@ -421,6 +538,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           if (profile) {
             setUser(profile);
             fetchRequests(session.user.id);
+            fetchFavorites();
+            fetchReviewedRequestIds();
           }
           setAuthLoading(false);
         });
@@ -429,7 +548,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       sessionRef.current = session;
       if (event === 'SIGNED_OUT' || !session?.user) {
@@ -439,7 +557,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setProfilesMap({});
         setNotifications([]);
         setMessages([]);
+        setFavorites([]);
+        setReviews([]);
+        setReviewedRequestIds(new Set());
         setActiveChatRequestId(null);
+        activeChatRef.current = null;
         setAuthLoading(false);
       } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         (async () => {
@@ -462,7 +584,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setUser(profile);
           fetchRequests(session.user.id);
           fetchNotifications();
-          // Complete expired rentals on login
+          fetchFavorites();
+          fetchReviewedRequestIds();
           supabase.rpc('complete_expired_rentals').then(() => {
             fetchListings();
           });
@@ -471,7 +594,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    // Subscribe to realtime listings changes
     const listingsChannel = supabase
       .channel('listings-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'listings' }, () => {
@@ -479,7 +601,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       })
       .subscribe();
 
-    // Subscribe to realtime rent_requests changes
     const requestsChannel = supabase
       .channel('requests-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rent_requests' }, () => {
@@ -489,7 +610,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       })
       .subscribe();
 
-    // Subscribe to realtime notifications changes
     const notificationsChannel = supabase
       .channel('notifications-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, () => {
@@ -497,17 +617,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
       })
       .subscribe();
 
-    // Subscribe to realtime messages changes
-    const messagesChannel = supabase
-      .channel('messages-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
-        if (activeChatRequestId) {
-          fetchMessages(activeChatRequestId);
+    const favoritesChannel = supabase
+      .channel('favorites-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'favorites' }, () => {
+        fetchFavorites();
+      })
+      .subscribe();
+
+    const reviewsChannel = supabase
+      .channel('reviews-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reviews' }, () => {
+        if (selectedItemId) {
+          fetchRating(selectedItemId);
+          fetchReviews(selectedItemId);
         }
       })
       .subscribe();
 
-    // Periodically check for expired rentals (every 60 seconds)
     const expiredInterval = setInterval(() => {
       supabase.rpc('complete_expired_rentals').then(() => {
         fetchListings();
@@ -524,12 +650,58 @@ export function AppProvider({ children }: { children: ReactNode }) {
       supabase.removeChannel(listingsChannel);
       supabase.removeChannel(requestsChannel);
       supabase.removeChannel(notificationsChannel);
-      supabase.removeChannel(messagesChannel);
+      supabase.removeChannel(favoritesChannel);
+      supabase.removeChannel(reviewsChannel);
+      if (messagesChannelRef.current) {
+        supabase.removeChannel(messagesChannelRef.current);
+        messagesChannelRef.current = null;
+      }
       clearInterval(expiredInterval);
     };
   }, []);
 
-  // Fetch listings when user logs in
+  // Realtime messages: subscribe to the specific conversation when active chat changes
+  useEffect(() => {
+    activeChatRef.current = activeChatRequestId;
+
+    // Remove old messages channel
+    if (messagesChannelRef.current) {
+      supabase.removeChannel(messagesChannelRef.current);
+      messagesChannelRef.current = null;
+    }
+
+    if (activeChatRequestId) {
+      // Fetch initial messages
+      fetchMessages(activeChatRequestId);
+
+      // Subscribe to new messages for this specific request
+      const channel = supabase
+        .channel(`messages-${activeChatRequestId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+            filter: `request_id=eq.${activeChatRequestId}`,
+          },
+          () => {
+            fetchMessages(activeChatRequestId);
+          },
+        )
+        .subscribe();
+
+      messagesChannelRef.current = channel;
+    }
+
+    return () => {
+      if (messagesChannelRef.current) {
+        supabase.removeChannel(messagesChannelRef.current);
+        messagesChannelRef.current = null;
+      }
+    };
+  }, [activeChatRequestId, fetchMessages]);
+
   useEffect(() => {
     if (user) {
       fetchListings();
@@ -543,7 +715,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .select('id, full_name, email, student_id, college, avatar_url')
       .eq('id', userId)
       .maybeSingle();
-
     if (error || !data) return null;
     return parseProfile(data);
   }
@@ -588,13 +759,58 @@ export function AppProvider({ children }: { children: ReactNode }) {
           .eq('id', data.user.id);
       }
 
-      return { error: null };
+      return { error: null, needsEmailConfirmation: true };
     } catch (err: any) {
       if (import.meta.env.DEV) console.error('[signup] unexpected error:', err);
       if (isNetworkError(err)) {
         return { error: 'Unable to connect to the server. Please check your internet connection and try again.' };
       }
       return { error: 'An unexpected error occurred during signup. Please try again.' };
+    }
+  }, []);
+
+  const verifyOtp = useCallback(async (email: string, token: string): Promise<{ error: string | null }> => {
+    const normalizedEmail = email.trim().toLowerCase();
+    try {
+      const { error } = await supabase.auth.verifyOtp({
+        email: normalizedEmail,
+        token,
+        type: 'signup',
+      });
+      if (error) {
+        if (isNetworkError(error)) {
+          return { error: 'Unable to connect to the server. Please check your internet connection and try again.' };
+        }
+        if (error.message.toLowerCase().includes('expired') || error.message.toLowerCase().includes('invalid')) {
+          return { error: 'Invalid or expired verification code. Please request a new one.' };
+        }
+        return { error: error.message };
+      }
+      return { error: null };
+    } catch (err: any) {
+      if (isNetworkError(err)) {
+        return { error: 'Unable to connect to the server. Please check your internet connection and try again.' };
+      }
+      return { error: 'Failed to verify code. Please try again.' };
+    }
+  }, []);
+
+  const resendOtp = useCallback(async (email: string): Promise<{ error: string | null }> => {
+    const normalizedEmail = email.trim().toLowerCase();
+    try {
+      const { error } = await supabase.auth.resend({
+        email: normalizedEmail,
+        type: 'signup',
+      });
+      if (error) {
+        if (isNetworkError(error)) {
+          return { error: 'Unable to connect to the server.' };
+        }
+        return { error: error.message };
+      }
+      return { error: null };
+    } catch (err: any) {
+      return { error: 'Failed to resend code.' };
     }
   }, []);
 
@@ -607,7 +823,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       });
 
       if (error) {
-        if (import.meta.env.DEV) console.error('[login] Supabase error:', error.message, '(code:', error.status, ')');
+        if (import.meta.env.DEV) console.error('[login] Supabase error:', error.message);
         if (isNetworkError(error)) {
           return { error: 'Unable to connect to the server. Please check your internet connection and try again.' };
         }
@@ -633,11 +849,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setUser(profile);
         fetchRequests(data.user.id);
         fetchNotifications();
+        fetchFavorites();
+        fetchReviewedRequestIds();
       }
 
       return { error: null };
     } catch (err: any) {
-      if (import.meta.env.DEV) console.error('[login] unexpected error:', err);
       if (isNetworkError(err)) {
         return { error: 'Unable to connect to the server. Please check your internet connection and try again.' };
       }
@@ -654,17 +871,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setSelectedItemId(null);
     setNotifications([]);
     setMessages([]);
+    setFavorites([]);
+    setReviews([]);
+    setReviewedRequestIds(new Set());
     setActiveChatRequestId(null);
   }, []);
 
   const deleteAccount = useCallback(async (): Promise<{ error: string | null }> => {
     if (!user) return { error: 'Not logged in.' };
     const userId = user.id;
-
     await supabase.from('listings').delete().eq('owner_id', userId);
     await supabase.from('rent_requests').delete().eq('requester_id', userId);
     await supabase.from('profiles').delete().eq('id', userId);
-
     await supabase.auth.signOut();
     setUser(null);
     setItems([]);
@@ -673,8 +891,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setSelectedItemId(null);
     setNotifications([]);
     setMessages([]);
+    setFavorites([]);
     setActiveChatRequestId(null);
-
     return { error: null };
   }, [user]);
 
@@ -688,29 +906,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     imageFile: File | null;
   }): Promise<{ error: string | null }> => {
     if (!user) return { error: 'Not logged in.' };
-
     let imageUrl = PLACEHOLDER_IMAGES[data.category];
-
     if (data.imageFile) {
       const fileExt = data.imageFile.name.split('.').pop();
       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
       const { error: uploadError } = await supabase.storage
         .from('listing-images')
         .upload(fileName, data.imageFile);
-
-      if (uploadError) {
-        return { error: `Image upload failed: ${uploadError.message}` };
-      }
-
+      if (uploadError) return { error: `Image upload failed: ${uploadError.message}` };
       const { data: urlData } = supabase.storage
         .from('listing-images')
         .getPublicUrl(fileName);
-
-      if (urlData?.publicUrl) {
-        imageUrl = urlData.publicUrl;
-      }
+      if (urlData?.publicUrl) imageUrl = urlData.publicUrl;
     }
-
     const { error: insertError } = await supabase.from('listings').insert({
       owner_id: user.id,
       title: data.name,
@@ -722,58 +930,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
       image_url: imageUrl,
       status: 'active',
     });
-
-    if (insertError) {
-      return { error: `Failed to create listing: ${insertError.message}` };
-    }
-
+    if (insertError) return { error: `Failed to create listing: ${insertError.message}` };
     fetchListings();
-
     return { error: null };
   }, [user, fetchListings]);
 
   const deleteListing = useCallback(async (itemId: string): Promise<{ success: boolean; message?: string }> => {
     if (!user) return { success: false, message: 'Not logged in.' };
-
     const { data: activeReqs } = await supabase
       .from('rent_requests')
       .select('id, status')
       .eq('listing_id', itemId)
       .in('status', ['pending', 'accepted']);
-
     if (activeReqs && activeReqs.length > 0) {
-      return {
-        success: false,
-        message: 'This item cannot be deleted while it has an active or pending rental request.',
-      };
+      return { success: false, message: 'This item cannot be deleted while it has an active or pending rental request.' };
     }
-
     const { data: listing } = await supabase
       .from('listings')
       .select('image_url')
       .eq('id', itemId)
       .maybeSingle();
-
     const { error } = await supabase.from('listings').delete().eq('id', itemId);
-
-    if (error) {
-      return { success: false, message: `Failed to delete: ${error.message}` };
-    }
-
+    if (error) return { success: false, message: `Failed to delete: ${error.message}` };
     if (listing?.image_url && listing.image_url.includes('listing-images')) {
       try {
         const url = new URL(listing.image_url);
         const pathMatch = url.pathname.match(/listing-images\/(.+)$/);
-        if (pathMatch) {
-          await supabase.storage.from('listing-images').remove([pathMatch[1]]);
-        }
-      } catch {
-        // ignore storage cleanup errors
-      }
+        if (pathMatch) await supabase.storage.from('listing-images').remove([pathMatch[1]]);
+      } catch { /* ignore */ }
     }
-
     fetchListings();
-
     return { success: true };
   }, [user, fetchListings]);
 
@@ -785,21 +971,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     message: string;
   }): Promise<{ error: string | null }> => {
     if (!user) return { error: 'Not logged in.' };
-
     const { data: listing, error: fetchError } = await supabase
       .from('listings')
       .select('availability, status')
       .eq('id', req.listingId)
       .maybeSingle();
-
-    if (fetchError || !listing) {
-      return { error: 'This item could not be found.' };
-    }
-
-    if (listing.availability !== 'available') {
-      return { error: 'This item is currently unavailable.' };
-    }
-
+    if (fetchError || !listing) return { error: 'This item could not be found.' };
+    if (listing.availability !== 'available') return { error: 'This item is currently unavailable.' };
     const { error } = await supabase.from('rent_requests').insert({
       listing_id: req.listingId,
       requester_id: user.id,
@@ -809,113 +987,62 @@ export function AppProvider({ children }: { children: ReactNode }) {
       message: req.message,
       status: 'pending',
     });
-
-    if (error) {
-      return { error: `Failed to send request: ${error.message}` };
-    }
-
+    if (error) return { error: `Failed to send request: ${error.message}` };
     fetchRequests(user.id);
-
     return { error: null };
   }, [user]);
 
   const updateRequestStatus = useCallback(async (id: string, status: RequestStatus): Promise<{ error: string | null }> => {
     if (!user) return { error: 'Not logged in.' };
-
-    // For accept, use the atomic RPC to prevent race conditions
     if (status === 'accepted') {
       const { data, error } = await supabase.rpc('accept_rental', { p_request_id: id });
-      if (error) {
-        if (import.meta.env.DEV) console.error('[accept_rental] error:', error.message);
-        return { error: 'Failed to accept request.' };
-      }
-      if (data && data.error) {
-        return { error: data.error as string };
-      }
+      if (error) return { error: 'Failed to accept request.' };
+      if (data && data.error) return { error: data.error as string };
       fetchRequests(user.id);
       fetchListings();
       fetchNotifications();
       return { error: null };
     }
-
-    // For reject, verify ownership and update
     const { data: req, error: fetchErr } = await supabase
       .from('rent_requests')
       .select('id, listing_id, status, owner_id')
       .eq('id', id)
       .maybeSingle();
-
-    if (fetchErr || !req) {
-      return { error: 'Request not found.' };
-    }
-
-    if (req.owner_id !== user.id) {
-      return { error: 'Only the item owner can reject requests.' };
-    }
-
+    if (fetchErr || !req) return { error: 'Request not found.' };
+    if (req.owner_id !== user.id) return { error: 'Only the item owner can reject requests.' };
     const { error } = await supabase
       .from('rent_requests')
       .update({ status })
       .eq('id', id);
-
-    if (error) {
-      return { error: `Failed to update request: ${error.message}` };
-    }
-
-    // For reject, set listing back to available (in case it was held)
+    if (error) return { error: `Failed to update request: ${error.message}` };
     if (status === 'rejected') {
-      await supabase
-        .from('listings')
-        .update({ availability: 'available' })
-        .eq('id', req.listing_id);
+      await supabase.from('listings').update({ availability: 'available' }).eq('id', req.listing_id);
     }
-
     fetchRequests(user.id);
     fetchListings();
     fetchNotifications();
-
     return { error: null };
   }, [user, fetchRequests, fetchListings, fetchNotifications]);
 
   const markReturned = useCallback(async (requestId: string): Promise<{ error: string | null }> => {
     if (!user) return { error: 'Not logged in.' };
-
     const { data: req, error: fetchErr } = await supabase
       .from('rent_requests')
       .select('id, listing_id, status, owner_id')
       .eq('id', requestId)
       .maybeSingle();
-
-    if (fetchErr || !req) {
-      return { error: 'Request not found.' };
-    }
-
-    if (req.owner_id !== user.id) {
-      return { error: 'Only the owner can mark an item as returned.' };
-    }
-
-    if (req.status !== 'accepted') {
-      return { error: 'Only accepted rentals can be marked as returned.' };
-    }
-
+    if (fetchErr || !req) return { error: 'Request not found.' };
+    if (req.owner_id !== user.id) return { error: 'Only the owner can mark an item as returned.' };
+    if (req.status !== 'accepted') return { error: 'Only accepted rentals can be marked as returned.' };
     const { error: updateErr } = await supabase
       .from('rent_requests')
       .update({ status: 'completed' })
       .eq('id', requestId);
-
-    if (updateErr) {
-      return { error: `Failed to update: ${updateErr.message}` };
-    }
-
-    await supabase
-      .from('listings')
-      .update({ availability: 'available' })
-      .eq('id', req.listing_id);
-
+    if (updateErr) return { error: `Failed to update: ${updateErr.message}` };
+    await supabase.from('listings').update({ availability: 'available' }).eq('id', req.listing_id);
     fetchRequests(user.id);
     fetchListings();
     fetchNotifications();
-
     return { error: null };
   }, [user, fetchRequests, fetchListings, fetchNotifications]);
 
@@ -925,10 +1052,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         user,
         authLoading,
         signup,
+        verifyOtp,
+        resendOtp,
         login,
         logout,
         deleteAccount,
         items,
+        exploreItems,
         itemsLoading,
         addListing,
         deleteListing,
@@ -951,6 +1081,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
         sendMessage,
         updateAvatar,
         removeAvatar,
+        favorites,
+        favoriteIds,
+        toggleFavorite,
+        fetchFavorites,
+        ratingsMap,
+        fetchRating,
+        reviews,
+        fetchReviews,
+        submitReview,
+        reviewedRequestIds,
+        fetchReviewedRequestIds,
       }}
     >
       {children}

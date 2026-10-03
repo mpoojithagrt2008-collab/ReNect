@@ -9,6 +9,7 @@ import { MyRentals } from './pages/MyRentals';
 import { MyItems } from './pages/MyItems';
 import { Messages } from './pages/Messages';
 import { Notifications } from './pages/Notifications';
+import { Favorites } from './pages/Favorites';
 import { Profile } from './pages/Profile';
 
 function AppContent() {
@@ -23,7 +24,7 @@ function AppContent() {
         </div>
         <div className="flex items-center gap-2 text-gray-500">
           <Loader2 className="h-5 w-5 animate-spin" />
-          <span className="text-sm font-medium">Loading CampusLoop...</span>
+          <span className="text-sm font-medium">Loading ReNect...</span>
         </div>
       </div>
     );
@@ -43,6 +44,7 @@ function AppContent() {
         {page === 'items' && <MyItems navigate={navigate} />}
         {page === 'messages' && <Messages navigate={navigate} />}
         {page === 'notifications' && <Notifications navigate={navigate} />}
+        {page === 'favorites' && <Favorites navigate={navigate} />}
         {page === 'profile' && <Profile navigate={navigate} />}
       </main>
     </div>
