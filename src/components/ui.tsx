@@ -60,7 +60,7 @@ export function StarRatingDisplay({ rating, count, size = 'h-4 w-4' }: { rating:
       </div>
       {count !== undefined && (
         <span className="text-xs font-medium text-gray-500">
-          {rating.toFixed(1)} ({count} {count === 1 ? 'review' : 'reviews'})
+          {rating.toFixed(1)} ⭐ ({count} {count === 1 ? 'review' : 'reviews'})
         </span>
       )}
     </span>

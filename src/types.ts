@@ -89,6 +89,7 @@ export interface Review {
   listingId: string;
   reviewerId: string;
   reviewerName: string;
+  reviewerStudentId: string;
   rating: number;
   feedback: string;
   createdAt: string;

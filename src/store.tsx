@@ -189,6 +189,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Explore items = all items except the logged-in user's own listings
   const exploreItems = items.filter((i) => i.ownerId !== user?.id);
 
+  const fetchAllRatings = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('reviews')
+      .select('listing_id, rating');
+    if (error || !data) return;
+
+    const totals: Record<string, { sum: number; count: number }> = {};
+    for (const review of data) {
+      const current = totals[review.listing_id] || { sum: 0, count: 0 };
+      totals[review.listing_id] = { sum: current.sum + review.rating, count: current.count + 1 };
+    }
+
+    setRatingsMap(Object.fromEntries(
+      Object.entries(totals).map(([listingId, total]) => [listingId, {
+        averageRating: total.sum / total.count,
+        reviewCount: total.count,
+      }]),
+    ));
+  }, []);
+
   // Fetch all active listings
   const fetchListings = useCallback(async () => {
     setItemsLoading(true);
@@ -226,7 +246,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
     setItems(parsed);
     setItemsLoading(false);
-  }, [profilesMap]);
+    fetchAllRatings();
+  }, [profilesMap, fetchAllRatings]);
 
   // Fetch requests for current user
   const fetchRequests = useCallback(async (userId: string) => {
@@ -499,7 +520,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (missingIds.length > 0) {
       const { data: pData } = await supabase
         .from('profiles')
-        .select('id, full_name')
+        .select('id, full_name, student_id')
         .in('id', missingIds);
       if (pData) {
         currentProfilesMap = { ...profilesMap };
@@ -514,6 +535,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       listingId: r.listing_id,
       reviewerId: r.reviewer_id,
       reviewerName: currentProfilesMap[r.reviewer_id]?.fullName || 'Anonymous',
+      reviewerStudentId: currentProfilesMap[r.reviewer_id]?.studentId || '',
       rating: r.rating,
       feedback: r.feedback || '',
       createdAt: r.created_at,
@@ -539,8 +561,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setReviewedRequestIds((prev) => new Set([...prev, requestId]));
     fetchRating(listingId);
     fetchReviews(listingId);
+    fetchAllRatings();
     return { error: null };
-  }, [user, fetchRating, fetchReviews]);
+  }, [user, fetchRating, fetchReviews, fetchAllRatings]);
 
   const fetchReviewedRequestIds = useCallback(async () => {
     const userId = sessionRef.current?.user?.id;
@@ -925,6 +948,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const reviewsChannel = supabase
       .channel('reviews-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'reviews' }, () => {
+        fetchAllRatings();
         if (selectedItemId) {
           fetchRating(selectedItemId);
           fetchReviews(selectedItemId);
