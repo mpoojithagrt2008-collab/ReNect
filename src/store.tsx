@@ -9,7 +9,7 @@ import {
 } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
-import type { Item, BorrowRequest, UserProfile, RequestStatus, Availability, AppNotification, ChatMessage, Favorite, Review, ListingRating } from './types';
+import type { Item, BorrowRequest, UserProfile, RequestStatus, Availability, AppNotification, ChatMessage, Favorite, Review, ListingRating, ReturnRecord, DamagePenalty, PaymentRecord, ReturnCondition, PaymentMethod } from './types';
 import { PLACEHOLDER_IMAGES } from './data';
 import type { Category, Condition } from './types';
 
@@ -71,6 +71,20 @@ interface AppContextType {
   submitReview: (requestId: string, listingId: string, rating: number, feedback: string) => Promise<{ error: string | null }>;
   reviewedRequestIds: Set<string>;
   fetchReviewedRequestIds: () => Promise<void>;
+  returns: ReturnRecord[];
+  returnsMap: Record<string, ReturnRecord>;
+  submitReturn: (requestId: string, listingId: string, photoFile: File, condition: ReturnCondition, note: string) => Promise<{ error: string | null }>;
+  fetchReturns: () => Promise<void>;
+  getReturnPhotoUrl: (requestId: string) => Promise<string | null>;
+  damagePenalties: DamagePenalty[];
+  penaltiesMap: Record<string, DamagePenalty>;
+  createPenalty: (requestId: string, listingId: string, borrowerId: string, amount: number, reason: string) => Promise<{ error: string | null }>;
+  fetchPenalties: () => Promise<void>;
+  payments: PaymentRecord[];
+  paymentsMap: Record<string, PaymentRecord[]>;
+  createPayment: (requestId: string, listingId: string, payeeId: string, amount: number, purpose: 'rental' | 'penalty', method: PaymentMethod, penaltyId?: string | null) => Promise<{ error: string | null; paymentId?: string }>;
+  verifyPayment: (paymentId: string, approved: boolean) => Promise<{ error: string | null }>;
+  fetchPayments: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -151,12 +165,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [ratingsMap, setRatingsMap] = useState<Record<string, ListingRating>>({});
   const [reviews, setReviews] = useState<Review[]>([]);
   const [reviewedRequestIds, setReviewedRequestIds] = useState<Set<string>>(new Set());
+  const [returns, setReturns] = useState<ReturnRecord[]>([]);
+  const [damagePenalties, setDamagePenalties] = useState<DamagePenalty[]>([]);
+  const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const sessionRef = useRef<Session | null>(null);
   const activeChatRef = useRef<string | null>(null);
   const messagesChannelRef = useRef<any>(null);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
   const favoriteIds = new Set(favorites.map((f) => f.listingId));
+  const returnsMap: Record<string, ReturnRecord> = {};
+  for (const r of returns) returnsMap[r.requestId] = r;
+  const penaltiesMap: Record<string, DamagePenalty> = {};
+  for (const p of damagePenalties) penaltiesMap[p.requestId] = p;
+  const paymentsMap: Record<string, PaymentRecord[]> = {};
+  for (const p of payments) {
+    if (!paymentsMap[p.requestId]) paymentsMap[p.requestId] = [];
+    paymentsMap[p.requestId].push(p);
+  }
 
   // Explore items = all items except the logged-in user's own listings
   const exploreItems = items.filter((i) => i.ownerId !== user?.id);
@@ -525,6 +551,270 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setReviewedRequestIds(new Set(data.map((r: any) => r.request_id)));
   }, []);
 
+  // =========================================================
+  // Returns: fetch, submit, get photo URL
+  // =========================================================
+  const fetchReturns = useCallback(async () => {
+    const userId = sessionRef.current?.user?.id;
+    if (!userId) return;
+    const { data, error } = await supabase
+      .from('returns')
+      .select('id, request_id, listing_id, borrower_id, return_photo_url, return_condition, return_note, status, created_at')
+      .or(`borrower_id.eq.${userId}`)
+      .order('created_at', { ascending: false });
+    if (error || !data) { setReturns([]); return; }
+    const ownReqIds = requests.filter(r => r.ownerId === userId).map(r => r.id);
+    let allReturns = [...data];
+    if (ownReqIds.length > 0) {
+      const { data: ownerReturns } = await supabase
+        .from('returns')
+        .select('id, request_id, listing_id, borrower_id, return_photo_url, return_condition, return_note, status, created_at')
+        .in('request_id', ownReqIds);
+      if (ownerReturns) allReturns = [...allReturns, ...ownerReturns];
+    }
+    const uniqueMap: Record<string, any> = {};
+    for (const r of allReturns) uniqueMap[r.id] = r;
+    const parsed: ReturnRecord[] = Object.values(uniqueMap).map((r: any) => ({
+      id: r.id,
+      requestId: r.request_id,
+      listingId: r.listing_id,
+      borrowerId: r.borrower_id,
+      returnPhotoUrl: r.return_photo_url,
+      returnCondition: r.return_condition as ReturnCondition,
+      returnNote: r.return_note || '',
+      status: r.status as 'submitted' | 'reviewed',
+      createdAt: r.created_at,
+    }));
+    setReturns(parsed);
+  }, [requests]);
+
+  const getReturnPhotoUrl = useCallback(async (requestId: string): Promise<string | null> => {
+    const { data } = await supabase
+      .from('returns')
+      .select('return_photo_url')
+      .eq('request_id', requestId)
+      .maybeSingle();
+    if (!data || !data.return_photo_url) return null;
+    if (data.return_photo_url.startsWith('http')) return data.return_photo_url;
+    const { data: signedUrl } = await supabase.storage
+      .from('return-photos')
+      .createSignedUrl(data.return_photo_url, 3600);
+    return signedUrl?.signedUrl || null;
+  }, []);
+
+  const submitReturn = useCallback(async (
+    requestId: string,
+    listingId: string,
+    photoFile: File,
+    condition: ReturnCondition,
+    note: string,
+  ): Promise<{ error: string | null }> => {
+    if (!user) return { error: 'Not logged in.' };
+    try {
+      const fileExt = photoFile.name.split('.').pop() || 'jpg';
+      const filePath = `${user.id}/${requestId}/${Date.now()}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage
+        .from('return-photos')
+        .upload(filePath, photoFile);
+      if (uploadError) return { error: 'Failed to upload return photo.' };
+      const { data: req } = await supabase
+        .from('rent_requests')
+        .select('owner_id')
+        .eq('id', requestId)
+        .maybeSingle();
+      const ownerId = req?.owner_id;
+      const { error: insertError } = await supabase.from('returns').insert({
+        request_id: requestId,
+        listing_id: listingId,
+        borrower_id: user.id,
+        return_photo_url: filePath,
+        return_condition: condition,
+        return_note: note,
+        status: 'submitted',
+      });
+      if (insertError) {
+        if (insertError.code === '23505') return { error: 'You have already submitted a return for this rental.' };
+        return { error: 'Failed to submit return.' };
+      }
+      if (ownerId) {
+        await supabase.from('notifications').insert({
+          user_id: ownerId,
+          actor_id: user.id,
+          type: 'return_submitted',
+          title: 'Return submitted',
+          body: 'A borrower has submitted a return with photo proof. Please review it.',
+          listing_id: listingId,
+          request_id: requestId,
+        });
+      }
+      fetchReturns();
+      fetchNotifications();
+      return { error: null };
+    } catch {
+      return { error: 'Failed to submit return. Please try again.' };
+    }
+  }, [user, fetchReturns, fetchNotifications]);
+
+  // =========================================================
+  // Damage Penalties: fetch, create
+  // =========================================================
+  const fetchPenalties = useCallback(async () => {
+    const userId = sessionRef.current?.user?.id;
+    if (!userId) return;
+    const { data, error } = await supabase
+      .from('damage_penalties')
+      .select('id, request_id, listing_id, owner_id, borrower_id, amount, reason, status, created_at')
+      .or(`owner_id.eq.${userId},borrower_id.eq.${userId}`)
+      .order('created_at', { ascending: false });
+    if (error || !data) { setDamagePenalties([]); return; }
+    const parsed: DamagePenalty[] = data.map((p: any) => ({
+      id: p.id,
+      requestId: p.request_id,
+      listingId: p.listing_id,
+      ownerId: p.owner_id,
+      borrowerId: p.borrower_id,
+      amount: p.amount,
+      reason: p.reason || '',
+      status: p.status as 'pending' | 'paid',
+      createdAt: p.created_at,
+    }));
+    setDamagePenalties(parsed);
+  }, []);
+
+  const createPenalty = useCallback(async (
+    requestId: string,
+    listingId: string,
+    borrowerId: string,
+    amount: number,
+    reason: string,
+  ): Promise<{ error: string | null }> => {
+    if (!user) return { error: 'Not logged in.' };
+    const { error } = await supabase.from('damage_penalties').insert({
+      request_id: requestId,
+      listing_id: listingId,
+      owner_id: user.id,
+      borrower_id: borrowerId,
+      amount,
+      reason,
+      status: 'pending',
+    });
+    if (error) {
+      if (error.code === '23505') return { error: 'A penalty has already been created for this rental.' };
+      return { error: 'Failed to create penalty.' };
+    }
+    await supabase.from('notifications').insert({
+      user_id: borrowerId,
+      actor_id: user.id,
+      type: 'penalty_created',
+      title: 'Damage penalty issued',
+      body: `A damage penalty of ₹${amount} has been issued for your rental. ${reason}`,
+      listing_id: listingId,
+      request_id: requestId,
+    });
+    fetchPenalties();
+    fetchNotifications();
+    return { error: null };
+  }, [user, fetchPenalties, fetchNotifications]);
+
+  // =========================================================
+  // Payments: fetch, create, verify
+  // =========================================================
+  const fetchPayments = useCallback(async () => {
+    const userId = sessionRef.current?.user?.id;
+    if (!userId) return;
+    const { data, error } = await supabase
+      .from('payments')
+      .select('id, request_id, listing_id, payer_id, payee_id, amount, purpose, penalty_id, method, status, provider_ref, created_at, updated_at')
+      .or(`payer_id.eq.${userId},payee_id.eq.${userId}`)
+      .order('created_at', { ascending: false });
+    if (error || !data) { setPayments([]); return; }
+    const parsed: PaymentRecord[] = data.map((p: any) => ({
+      id: p.id,
+      requestId: p.request_id,
+      listingId: p.listing_id,
+      payerId: p.payer_id,
+      payeeId: p.payee_id,
+      amount: p.amount,
+      purpose: p.purpose as 'rental' | 'penalty',
+      penaltyId: p.penalty_id || null,
+      method: p.method as 'online' | 'offline',
+      status: p.status as 'pending' | 'pending_verification' | 'paid' | 'failed' | 'cancelled',
+      providerRef: p.provider_ref || null,
+      createdAt: p.created_at,
+      updatedAt: p.updated_at,
+    }));
+    setPayments(parsed);
+  }, []);
+
+  const createPayment = useCallback(async (
+    requestId: string,
+    listingId: string,
+    payeeId: string,
+    amount: number,
+    purpose: 'rental' | 'penalty',
+    method: PaymentMethod,
+    penaltyId?: string | null,
+  ): Promise<{ error: string | null; paymentId?: string }> => {
+    if (!user) return { error: 'Not logged in.' };
+    const status = method === 'offline' ? 'pending_verification' : 'pending';
+    const { data, error } = await supabase.from('payments').insert({
+      request_id: requestId,
+      listing_id: listingId,
+      payer_id: user.id,
+      payee_id: payeeId,
+      amount,
+      purpose,
+      penalty_id: penaltyId || null,
+      method,
+      status,
+    }).select('id').maybeSingle();
+    if (error) return { error: 'Failed to create payment record.' };
+    await supabase.from('notifications').insert({
+      user_id: payeeId,
+      actor_id: user.id,
+      type: method === 'offline' ? 'offline_payment_submitted' : 'online_payment_pending',
+      title: method === 'offline' ? 'Offline payment submitted' : 'Online payment initiated',
+      body: `A ${method} payment of ₹${amount} has been submitted for ${purpose === 'rental' ? 'rental' : 'damage penalty'}.${method === 'offline' ? ' Please verify it.' : ''}`,
+      listing_id: listingId,
+      request_id: requestId,
+    });
+    fetchPayments();
+    fetchNotifications();
+    return { error: null, paymentId: data?.id };
+  }, [user, fetchPayments, fetchNotifications]);
+
+  const verifyPayment = useCallback(async (paymentId: string, approved: boolean): Promise<{ error: string | null }> => {
+    if (!user) return { error: 'Not logged in.' };
+    const { data: payment, error: fetchErr } = await supabase
+      .from('payments')
+      .select('id, payee_id, status, purpose, penalty_id, payer_id, request_id')
+      .eq('id', paymentId)
+      .maybeSingle();
+    if (fetchErr || !payment) return { error: 'Payment not found.' };
+    if (payment.payee_id !== user.id) return { error: 'Only the recipient can verify payments.' };
+    const newStatus = approved ? 'paid' : 'failed';
+    const { error } = await supabase
+      .from('payments')
+      .update({ status: newStatus, updated_at: new Date().toISOString() })
+      .eq('id', paymentId);
+    if (error) return { error: 'Failed to update payment status.' };
+    if (approved && payment.purpose === 'penalty' && payment.penalty_id) {
+      await supabase.from('damage_penalties').update({ status: 'paid' }).eq('id', payment.penalty_id);
+      fetchPenalties();
+    }
+    await supabase.from('notifications').insert({
+      user_id: payment.payer_id,
+      actor_id: user.id,
+      type: approved ? 'payment_verified' : 'payment_rejected',
+      title: approved ? 'Payment verified' : 'Payment rejected',
+      body: approved ? 'Your payment has been verified and marked as paid.' : 'Your payment was rejected. Please contact the owner.',
+      request_id: payment.request_id,
+    });
+    fetchPayments();
+    fetchNotifications();
+    return { error: null };
+  }, [user, fetchPayments, fetchPenalties, fetchNotifications]);
+
   // Auth state + initial data
   useEffect(() => {
     let mounted = true;
@@ -560,6 +850,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setFavorites([]);
         setReviews([]);
         setReviewedRequestIds(new Set());
+        setReturns([]);
+        setDamagePenalties([]);
+        setPayments([]);
         setActiveChatRequestId(null);
         activeChatRef.current = null;
         setAuthLoading(false);
@@ -586,6 +879,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           fetchNotifications();
           fetchFavorites();
           fetchReviewedRequestIds();
+          fetchReturns();
+          fetchPenalties();
+          fetchPayments();
           supabase.rpc('complete_expired_rentals').then(() => {
             fetchListings();
           });
@@ -634,6 +930,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
       })
       .subscribe();
 
+    const returnsChannel = supabase
+      .channel('returns-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'returns' }, () => {
+        fetchReturns();
+        fetchNotifications();
+      })
+      .subscribe();
+
+    const penaltiesChannel = supabase
+      .channel('penalties-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'damage_penalties' }, () => {
+        fetchPenalties();
+        fetchNotifications();
+      })
+      .subscribe();
+
+    const paymentsChannel = supabase
+      .channel('payments-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, () => {
+        fetchPayments();
+        fetchNotifications();
+      })
+      .subscribe();
+
     const expiredInterval = setInterval(() => {
       supabase.rpc('complete_expired_rentals').then(() => {
         fetchListings();
@@ -652,6 +972,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       supabase.removeChannel(notificationsChannel);
       supabase.removeChannel(favoritesChannel);
       supabase.removeChannel(reviewsChannel);
+      supabase.removeChannel(returnsChannel);
+      supabase.removeChannel(penaltiesChannel);
+      supabase.removeChannel(paymentsChannel);
       if (messagesChannelRef.current) {
         supabase.removeChannel(messagesChannelRef.current);
         messagesChannelRef.current = null;
@@ -851,6 +1174,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         fetchNotifications();
         fetchFavorites();
         fetchReviewedRequestIds();
+        fetchReturns();
+        fetchPenalties();
+        fetchPayments();
       }
 
       return { error: null };
@@ -874,6 +1200,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setFavorites([]);
     setReviews([]);
     setReviewedRequestIds(new Set());
+    setReturns([]);
+    setDamagePenalties([]);
+    setPayments([]);
     setActiveChatRequestId(null);
   }, []);
 
@@ -892,6 +1221,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setNotifications([]);
     setMessages([]);
     setFavorites([]);
+    setReturns([]);
+    setDamagePenalties([]);
+    setPayments([]);
     setActiveChatRequestId(null);
     return { error: null };
   }, [user]);
@@ -1092,6 +1424,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
         submitReview,
         reviewedRequestIds,
         fetchReviewedRequestIds,
+        returns,
+        returnsMap,
+        submitReturn,
+        fetchReturns,
+        getReturnPhotoUrl,
+        damagePenalties,
+        penaltiesMap,
+        createPenalty,
+        fetchPenalties,
+        payments,
+        paymentsMap,
+        createPayment,
+        verifyPayment,
+        fetchPayments,
       }}
     >
       {children}

@@ -96,3 +96,52 @@ export interface ListingRating {
   averageRating: number;
   reviewCount: number;
 }
+
+export type ReturnCondition = 'good' | 'minor_damage' | 'damaged';
+export type ReturnStatus = 'submitted' | 'reviewed';
+
+export interface ReturnRecord {
+  id: string;
+  requestId: string;
+  listingId: string;
+  borrowerId: string;
+  returnPhotoUrl: string;
+  returnCondition: ReturnCondition;
+  returnNote: string;
+  status: ReturnStatus;
+  createdAt: string;
+}
+
+export type PenaltyStatus = 'pending' | 'paid';
+
+export interface DamagePenalty {
+  id: string;
+  requestId: string;
+  listingId: string;
+  ownerId: string;
+  borrowerId: string;
+  amount: number;
+  reason: string;
+  status: PenaltyStatus;
+  createdAt: string;
+}
+
+export type PaymentMethod = 'online' | 'offline';
+export type PaymentStatus = 'pending' | 'pending_verification' | 'paid' | 'failed' | 'cancelled';
+export type PaymentPurpose = 'rental' | 'penalty';
+
+export interface PaymentRecord {
+  id: string;
+  requestId: string;
+  listingId: string;
+  payerId: string;
+  payeeId: string;
+  amount: number;
+  purpose: PaymentPurpose;
+  penaltyId: string | null;
+  method: PaymentMethod;
+  status: PaymentStatus;
+  providerRef: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
