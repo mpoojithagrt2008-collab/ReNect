@@ -1,12 +1,35 @@
 import { useState, useEffect } from 'react';
 import {
-  ArrowLeft, MapPin, User, Tag, Calendar, MessageSquare, Send, CheckCircle2, Loader2, AlertCircle, Trash2, XCircle, Heart,
+  ArrowLeft, MapPin, User, Tag, Calendar, MessageSquare, Send, CheckCircle2, Loader2, AlertCircle, Trash2, XCircle, Heart, Clock,
 } from 'lucide-react';
 import type { Item } from '../types';
 import { useApp } from '../store';
-import { VerifiedBadge, ConditionBadge, formatPrice, StarRatingDisplay, formatOwnerName } from '../components/ui';
+import { VerifiedBadge, ConditionBadge, formatPrice, StarRatingDisplay, formatOwnerName, formatRentalDuration } from '../components/ui';
 
 interface Props { item: Item; onBack: () => void; }
+
+type DurationPreset = '1h' | '2h' | '3h' | '12h' | '1d' | 'custom';
+
+const PRESET_LABELS: Record<DurationPreset, string> = {
+  '1h': '1 Hour',
+  '2h': '2 Hours',
+  '3h': '3 Hours',
+  '12h': '12 Hours',
+  '1d': '1 Day',
+  custom: 'Custom',
+};
+
+function formatDateTimeLocal(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function formatDisplayDateTime(dateStr: string): string {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' +
+    d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
 
 export function ItemDetails({ item, onBack }: Props) {
   const { user, addRequest, deleteListing, favoriteIds, toggleFavorite, ratingsMap, fetchRating, reviews, fetchReviews } = useApp();
@@ -14,6 +37,7 @@ export function ItemDetails({ item, onBack }: Props) {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [durationPreset, setDurationPreset] = useState<DurationPreset>('1h');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [message, setMessage] = useState('');
@@ -26,21 +50,58 @@ export function ItemDetails({ item, onBack }: Props) {
   const isFavorite = favoriteIds.has(item.id);
   const rating = ratingsMap[item.id];
 
-  const rentalDuration = (() => {
+  // When a preset is selected, auto-calculate start (now) and end times
+  useEffect(() => {
+    if (durationPreset === 'custom') return;
+    const now = new Date();
+    const end = new Date(now);
+    if (durationPreset === '1h') end.setHours(end.getHours() + 1);
+    else if (durationPreset === '2h') end.setHours(end.getHours() + 2);
+    else if (durationPreset === '3h') end.setHours(end.getHours() + 3);
+    else if (durationPreset === '12h') end.setHours(end.getHours() + 12);
+    else if (durationPreset === '1d') end.setDate(end.getDate() + 1);
+    setStartDate(formatDateTimeLocal(now));
+    setEndDate(formatDateTimeLocal(end));
+  }, [durationPreset]);
+
+  const rentalDurationHours = (() => {
     if (!startDate || !endDate) return 0;
     const start = new Date(startDate); const end = new Date(endDate);
     const diffMs = end.getTime() - start.getTime();
     if (diffMs <= 0) return 0;
-    if (item.pricingType === 'hour') return Math.round(diffMs / (1000 * 60 * 60));
-    return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    return Math.round(diffMs / (1000 * 60 * 60));
   })();
-  const rentalTotal = rentalDuration > 0 ? rentalDuration * item.pricePerDay : 0;
+
+  const rentalDurationLabel = (() => {
+    if (rentalDurationHours <= 0) return '—';
+    if (rentalDurationHours < 24) return `${rentalDurationHours} ${rentalDurationHours === 1 ? 'Hour' : 'Hours'}`;
+    const days = Math.ceil(rentalDurationHours / 24);
+    return `${days} ${days === 1 ? 'Day' : 'Days'}`;
+  })();
+
+  const rentalTotal = (() => {
+    if (rentalDurationHours <= 0) return 0;
+    if (rentalDurationHours < 24) {
+      // Use hourly rate if available, otherwise fall back to daily rate prorated
+      if (item.pricePerHour > 0) return rentalDurationHours * item.pricePerHour;
+      return Math.ceil(rentalDurationHours / 24) * item.pricePerDay;
+    }
+    const days = Math.ceil(rentalDurationHours / 24);
+    return days * item.pricePerDay;
+  })();
+
+  const rateLabel = (() => {
+    if (item.pricePerHour > 0 && rentalDurationHours < 24) return `₹${item.pricePerHour}/hour`;
+    return `₹${item.pricePerDay}/day`;
+  })();
 
   useEffect(() => { fetchRating(item.id); fetchReviews(item.id); }, [item.id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setError(null); setSubmitting(true);
-    const result = await addRequest({ listingId: item.id, ownerId: item.ownerId, startDate, endDate, message });
+    const startISO = new Date(startDate).toISOString();
+    const endISO = new Date(endDate).toISOString();
+    const result = await addRequest({ listingId: item.id, ownerId: item.ownerId, startDate: startISO, endDate: endISO, message });
     setSubmitting(false);
     if (result.error) { setError(result.error); } else { setSubmitted(true); }
   };
@@ -106,7 +167,7 @@ export function ItemDetails({ item, onBack }: Props) {
           </div>
 
           <div className="rounded-2xl bg-lavender-50 px-4 py-3">
-            <span className="text-2xl font-bold text-lavender-600">{formatPrice(item.pricePerDay, item.pricingType)}</span>
+            <span className="text-2xl font-bold text-lavender-600">{formatPrice(item.pricePerDay, item.pricingType, item.pricePerHour)}</span>
           </div>
 
           <p className="text-sm leading-relaxed text-gray-600">{item.description}</p>
@@ -155,32 +216,57 @@ export function ItemDetails({ item, onBack }: Props) {
           ) : showRequestForm ? (
             <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-lavender-100 bg-white p-4 shadow-card">
               <h3 className="text-sm font-semibold text-gray-800">Request to Borrow</h3>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="mb-1.5 block text-xs font-medium text-gray-500">Start Date</label>
-                  <div className="relative">
-                    <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-lavender-400" />
-                    <input type="date" required value={startDate} onChange={(e) => setStartDate(e.target.value)}
-                      className="w-full rounded-xl border border-lavender-100 bg-lavender-50/40 py-2 pl-9 pr-2 text-sm text-gray-800 outline-none focus:border-lavender-400 focus:bg-white focus:ring-2 focus:ring-lavender-100" />
-                  </div>
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-xs font-medium text-gray-500">End Date</label>
-                  <div className="relative">
-                    <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-lavender-400" />
-                    <input type="date" required value={endDate} onChange={(e) => setEndDate(e.target.value)}
-                      className="w-full rounded-xl border border-lavender-100 bg-lavender-50/40 py-2 pl-9 pr-2 text-sm text-gray-800 outline-none focus:border-lavender-400 focus:bg-white focus:ring-2 focus:ring-lavender-100" />
-                  </div>
+
+              {/* Duration preset selection */}
+              <div>
+                <label className="mb-2 block text-xs font-medium text-gray-500">Select Duration</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['1h', '2h', '3h', '12h', '1d', 'custom'] as DurationPreset[]).map((preset) => (
+                    <button key={preset} type="button" onClick={() => setDurationPreset(preset)}
+                      className={`rounded-xl border-2 px-3 py-2 text-xs font-medium transition-all ${durationPreset === preset
+                        ? 'border-lavender-300 bg-lavender-50 text-lavender-700'
+                        : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'}`}>
+                      {PRESET_LABELS[preset]}
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              {rentalDuration > 0 && (
-                <div className="rounded-xl bg-lavender-50 px-3 py-2.5 text-xs">
-                  <div className="flex items-center justify-between"><span className="text-gray-500">Rate</span><span className="font-medium text-gray-800">₹{item.pricePerDay}/{item.pricingType === 'hour' ? 'hour' : 'day'}</span></div>
-                  <div className="mt-1 flex items-center justify-between"><span className="text-gray-500">Duration</span><span className="font-medium text-gray-800">{rentalDuration} {item.pricingType === 'hour' ? 'hour' + (rentalDuration !== 1 ? 's' : '') : 'day' + (rentalDuration !== 1 ? 's' : '')}</span></div>
-                  <div className="mt-1.5 flex items-center justify-between border-t border-lavender-200 pt-1.5"><span className="font-semibold text-gray-700">Total</span><span className="text-base font-bold text-lavender-600">₹{rentalTotal}</span></div>
+              {/* Custom date/time pickers */}
+              {durationPreset === 'custom' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium text-gray-500">From: Date + Time</label>
+                    <div className="relative">
+                      <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-lavender-400" />
+                      <input type="datetime-local" required value={startDate} onChange={(e) => setStartDate(e.target.value)}
+                        className="w-full rounded-xl border border-lavender-100 bg-lavender-50/40 py-2 pl-9 pr-2 text-sm text-gray-800 outline-none focus:border-lavender-400 focus:bg-white focus:ring-2 focus:ring-lavender-100" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium text-gray-500">To: Date + Time</label>
+                    <div className="relative">
+                      <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-lavender-400" />
+                      <input type="datetime-local" required value={endDate} onChange={(e) => setEndDate(e.target.value)}
+                        className="w-full rounded-xl border border-lavender-100 bg-lavender-50/40 py-2 pl-9 pr-2 text-sm text-gray-800 outline-none focus:border-lavender-400 focus:bg-white focus:ring-2 focus:ring-lavender-100" />
+                    </div>
+                  </div>
                 </div>
               )}
+
+              {/* Rental period summary */}
+              {rentalDurationHours > 0 && (
+                <div className="rounded-xl bg-lavender-50 px-3 py-3 text-xs">
+                  <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-gray-700">
+                    <Clock className="h-4 w-4 text-lavender-500" /> Rental Duration: {rentalDurationLabel}
+                  </div>
+                  <div className="flex items-center justify-between"><span className="text-gray-500">From</span><span className="font-medium text-gray-800">{formatDisplayDateTime(startDate)}</span></div>
+                  <div className="mt-1 flex items-center justify-between"><span className="text-gray-500">To</span><span className="font-medium text-gray-800">{formatDisplayDateTime(endDate)}</span></div>
+                  <div className="mt-1.5 flex items-center justify-between"><span className="text-gray-500">Rate</span><span className="font-medium text-gray-800">{rateLabel}</span></div>
+                  <div className="mt-1.5 flex items-center justify-between border-t border-lavender-200 pt-1.5"><span className="font-semibold text-gray-700">Estimated Price</span><span className="text-base font-bold text-lavender-600">₹{rentalTotal}</span></div>
+                </div>
+              )}
+
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-gray-500">Message to owner</label>
                 <div className="relative">
@@ -189,7 +275,7 @@ export function ItemDetails({ item, onBack }: Props) {
                     className="w-full rounded-xl border border-lavender-100 bg-lavender-50/40 py-2 pl-9 pr-3 text-sm text-gray-800 outline-none focus:border-lavender-400 focus:bg-white focus:ring-2 focus:ring-lavender-100" />
                 </div>
               </div>
-              <button type="submit" disabled={submitting}
+              <button type="submit" disabled={submitting || rentalDurationHours <= 0}
                 className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-lavender-500 to-lavender-600 py-2.5 text-sm font-semibold text-white shadow-soft-lg transition-all hover:shadow-lg active:scale-[0.98] disabled:opacity-50">
                 {submitting ? (<><Loader2 className="h-4 w-4 animate-spin" /> Sending request...</>) : (<><Send className="h-4 w-4" /> Submit Request</>)}
               </button>

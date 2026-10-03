@@ -1,22 +1,22 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import {
-  Plus, Package, Check, X, Clock, MessageSquare, Calendar, Inbox, Trash2, AlertTriangle,
-  Camera, Image as ImageIcon, Loader2, AlertCircle, MessageCircle, PackageCheck,
+  Plus, Package, Check, X, AlertTriangle,
+  Camera, Image as ImageIcon, Loader2, AlertCircle, Trash2,
 } from 'lucide-react';
 import { useApp } from '../store';
-import { formatOwnerName, formatRentalDuration } from '../components/ui';
 import { CATEGORIES, CONDITIONS } from '../data';
 import { ItemCard } from '../components/ItemCard';
 import type { Category, Condition, PricingType } from '../types';
 
 export function MyItems({ navigate }: { navigate: (p: import('../components/Navigation').Page) => void }) {
-  const { user, items, addListing, deleteListing, requests, updateRequestStatus, markReturned, setActiveChatRequestId, profilesMap, returnsMap, getReturnPhotoUrl } = useApp();
+  const { user, items, addListing, deleteListing } = useApp();
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState('');
   const [category, setCategory] = useState<Category>('Books');
   const [description, setDescription] = useState('');
   const [condition, setCondition] = useState<Condition>('Good');
-  const [price, setPrice] = useState('');
+  const [pricePerHour, setPricePerHour] = useState('');
+  const [pricePerDay, setPricePerDay] = useState('');
   const [pricingType, setPricingType] = useState<PricingType>('day');
   const [location, setLocation] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -29,25 +29,13 @@ export function MyItems({ navigate }: { navigate: (p: import('../components/Navi
   const [deleting, setDeleting] = useState(false);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
-  const [returnPhotoUrls, setReturnPhotoUrls] = useState<Record<string, string>>({});
 
   const myListings = useMemo(() => items.filter((i) => i.ownerId === user?.id), [items, user]);
-  const incomingRequests = useMemo(() => requests.filter((r) => r.ownerId === user?.id), [requests, user]);
-
-  useEffect(() => {
-    for (const req of incomingRequests) {
-      const ret = returnsMap[req.id];
-      if (ret && !returnPhotoUrls[req.id]) {
-        getReturnPhotoUrl(req.id).then((url) => {
-          if (url) setReturnPhotoUrls((prev) => ({ ...prev, [req.id]: url }));
-        });
-      }
-    }
-  }, [incomingRequests, returnsMap, returnPhotoUrls, getReturnPhotoUrl]);
 
   const resetForm = () => {
     setName(''); setCategory('Books'); setDescription(''); setCondition('Good');
-    setPrice(''); setPricingType('day'); setLocation('');
+    setPricePerHour(''); setPricePerDay(''); setPricingType('day');
+    setLocation('');
     setImageFile(null); setImagePreview(null); setSubmitError(null);
   };
 
@@ -70,7 +58,9 @@ export function MyItems({ navigate }: { navigate: (p: import('../components/Navi
     e.preventDefault(); setSubmitError(null); setSubmitting(true);
     const result = await addListing({
       name, category, description, condition,
-      pricePerDay: price ? Number(price) : 0, pricingType,
+      pricePerHour: pricePerHour ? Number(pricePerHour) : 0,
+      pricePerDay: pricePerDay ? Number(pricePerDay) : 0,
+      pricingType,
       location: location || 'Campus', imageFile,
     });
     setSubmitting(false);
@@ -190,7 +180,19 @@ export function MyItems({ navigate }: { navigate: (p: import('../components/Navi
               </select>
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-600">Pricing Type</label>
+              <label className="mb-1.5 block text-sm font-medium text-gray-600">Location</label>
+              <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Hostel H-4, Campus" className={inputClass} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-gray-600">Price per Hour (₹) <span className="text-gray-400">— 0 if not applicable</span></label>
+              <input type="number" min="0" value={pricePerHour} onChange={(e) => setPricePerHour(e.target.value)} placeholder="e.g. 20" className={inputClass} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-gray-600">Price per Day (₹) <span className="text-gray-400">— 0 if not applicable</span></label>
+              <input type="number" min="0" value={pricePerDay} onChange={(e) => setPricePerDay(e.target.value)} placeholder="e.g. 150" className={inputClass} />
+            </div>
+            <div className="md:col-span-2">
+              <label className="mb-1.5 block text-sm font-medium text-gray-600">Primary Pricing Type</label>
               <div className="grid grid-cols-2 gap-2">
                 <button type="button" onClick={() => setPricingType('hour')}
                   className={`rounded-2xl border-2 px-4 py-2.5 text-sm font-medium transition-all ${pricingType === 'hour' ? 'border-lavender-300 bg-lavender-50 text-lavender-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'}`}>
@@ -201,14 +203,7 @@ export function MyItems({ navigate }: { navigate: (p: import('../components/Navi
                   Per Day
                 </button>
               </div>
-            </div>
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-600">Price per {pricingType === 'hour' ? 'hour' : 'day'} (₹) <span className="text-gray-400">— 0 for free</span></label>
-              <input type="number" min="0" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0" className={inputClass} />
-            </div>
-            <div className="md:col-span-2">
-              <label className="mb-1.5 block text-sm font-medium text-gray-600">Location</label>
-              <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Hostel H-4, Campus" className={inputClass} />
+              <p className="mt-1.5 text-[11px] text-gray-400">Set both prices if you want to offer both hourly and daily rentals. The primary type determines how the item is displayed first.</p>
             </div>
           </div>
 
@@ -225,115 +220,7 @@ export function MyItems({ navigate }: { navigate: (p: import('../components/Navi
         </form>
       )}
 
-      {/* Incoming requests */}
-      {incomingRequests.length > 0 && (
-        <div className="mb-8">
-          <div className="mb-3 flex items-center gap-2">
-            <Inbox className="h-5 w-5 text-lavender-600" />
-            <h2 className="text-base font-semibold text-gray-800">Incoming Requests</h2>
-            <span className="rounded-full bg-lavender-100 px-2 py-0.5 text-xs font-semibold text-lavender-700">{incomingRequests.length}</span>
-          </div>
-          <div className="space-y-3">
-            {incomingRequests.map((req) => (
-              <div key={req.id} className="rounded-3xl border border-lavender-100 bg-white p-4 shadow-card">
-                <div className="flex items-start gap-4">
-                  <img src={req.itemImage} alt={req.itemName} className="h-14 w-14 shrink-0 rounded-2xl object-cover" />
-                  <div className="min-w-0 flex-1">
-                    <h3 className="truncate text-sm font-semibold text-gray-800">{req.itemName}</h3>
-                    <p className="text-xs text-gray-500"><span className="font-medium text-gray-600">Rented By:</span> <span className="font-medium text-gray-700">{formatOwnerName(req.requesterName, profilesMap[req.requesterId]?.studentId || '')}</span></p>
-                    <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-400">
-                      <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />{req.startDate} → {req.endDate}</span>
-                      <span><span className="font-medium text-gray-500">Rented For:</span> {formatRentalDuration(req.startDate, req.endDate)}</span>
-                    </div>
-                    {req.message && (
-                      <div className="mt-2 flex items-start gap-1.5 rounded-xl bg-lavender-50/50 px-3 py-2 text-xs text-gray-600">
-                        <MessageSquare className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400" />
-                        <span>{req.message}</span>
-                      </div>
-                    )}
-                    {returnsMap[req.id] && (
-                      <div className="mt-3 rounded-2xl border border-babyblue-200 bg-babyblue-50/50 p-3">
-                        <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-babyblue-700">
-                          <PackageCheck className="h-4 w-4" /> Return Submitted by Borrower
-                        </div>
-                        <div className="flex gap-3">
-                          {returnPhotoUrls[req.id] ? (
-                            <img src={returnPhotoUrls[req.id]} alt="Return proof" className="h-20 w-20 shrink-0 rounded-xl border border-babyblue-200 object-cover" />
-                          ) : (
-                            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl border border-babyblue-200 bg-babyblue-100/50">
-                              <Loader2 className="h-5 w-5 animate-spin text-babyblue-400" />
-                            </div>
-                          )}
-                          <div className="min-w-0 flex-1 space-y-1">
-                            <div className="flex items-center gap-2 text-xs">
-                              <span className="text-gray-500">Condition:</span>
-                              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                                returnsMap[req.id].returnCondition === 'good' ? 'bg-mint-100 text-mint-700'
-                                  : returnsMap[req.id].returnCondition === 'minor_damage' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600'
-                              }`}>
-                                {returnsMap[req.id].returnCondition === 'good' ? 'Good Condition' : returnsMap[req.id].returnCondition === 'minor_damage' ? 'Minor Damage' : 'Damaged'}
-                              </span>
-                            </div>
-                            {returnsMap[req.id].returnNote && (
-                              <div className="text-xs text-gray-600"><span className="font-medium text-gray-500">Note: </span>{returnsMap[req.id].returnNote}</div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="mt-3 flex items-center justify-between border-t border-lavender-100 pt-3">
-                  <span className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold capitalize ring-1 ring-inset ${
-                    req.status === 'pending' ? 'bg-amber-50 text-amber-700 ring-amber-200'
-                      : req.status === 'accepted' ? 'bg-mint-50 text-mint-700 ring-mint-200'
-                      : req.status === 'completed' ? 'bg-babyblue-50 text-babyblue-700 ring-babyblue-200'
-                      : 'bg-red-50 text-red-600 ring-red-200'
-                  }`}>
-                    {req.status === 'pending' && <Clock className="h-3.5 w-3.5" />}
-                    {req.status === 'accepted' && <Check className="h-3.5 w-3.5" />}
-                    {req.status === 'rejected' && <X className="h-3.5 w-3.5" />}
-                    {req.status === 'completed' && <Check className="h-3.5 w-3.5" />}
-                    {req.status}
-                  </span>
-
-                  {req.status === 'pending' && (
-                    <div className="flex gap-2">
-                      <button onClick={async () => {
-                        const result = await updateRequestStatus(req.id, 'accepted');
-                        if (result?.error) { setDeleteError(result.error); setTimeout(() => setDeleteError(null), 4000); }
-                      }} className="flex items-center gap-1.5 rounded-full bg-mint-500 px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-mint-600">
-                        <Check className="h-3.5 w-3.5" /> Accept
-                      </button>
-                      <button onClick={async () => { await updateRequestStatus(req.id, 'rejected'); }}
-                        className="flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600">
-                        <X className="h-3.5 w-3.5" /> Reject
-                      </button>
-                    </div>
-                  )}
-                  {req.status === 'accepted' && (
-                    <div className="flex gap-2">
-                      <button onClick={() => { setActiveChatRequestId(req.id); navigate('messages'); }}
-                        className="flex items-center gap-1.5 rounded-full bg-lavender-50 px-3.5 py-1.5 text-xs font-semibold text-lavender-700 transition-colors hover:bg-lavender-100">
-                        <MessageCircle className="h-3.5 w-3.5" /> Chat
-                      </button>
-                      <button onClick={async () => {
-                        const result = await markReturned(req.id);
-                        if (result?.error) { setDeleteError(result.error); setTimeout(() => setDeleteError(null), 4000); }
-                      }} className="flex items-center gap-1.5 rounded-full bg-babyblue-500 px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-babyblue-600">
-                        <Check className="h-3.5 w-3.5" /> {returnsMap[req.id] ? 'Confirm Return' : 'Mark Returned'}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Listings */}
+      {/* Listings — only items the current user has listed */}
       {myListings.length > 0 ? (
         <>
           <h2 className="mb-3 text-sm font-semibold text-gray-600">Your listings ({myListings.length})</h2>

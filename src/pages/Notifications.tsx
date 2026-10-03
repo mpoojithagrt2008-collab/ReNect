@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   Bell, Package, CheckCircle2, XCircle, Recycle, CheckCheck, Inbox, Star, Loader2, AlertCircle,
+  MessageCircle, PackageCheck,
 } from 'lucide-react';
 import { useApp } from '../store';
 import type { Page } from '../components/Navigation';
@@ -31,14 +32,31 @@ function timeAgo(dateStr: string): string {
 }
 
 export function Notifications({ navigate }: Props) {
-  const { notifications, markNotificationRead, markAllNotificationsRead, setSelectedItemId, unreadCount, updateRequestStatus } = useApp();
+  const { notifications, markNotificationRead, markAllNotificationsRead, setSelectedItemId, unreadCount, updateRequestStatus, markReturned, setActiveChatRequestId, requests } = useApp();
   const [actingRequestId, setActingRequestId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  const acceptedRequestIds = new Set(requests.filter((r) => r.status === 'accepted' && r.ownerId).map((r) => r.id));
 
   const handleClick = (notif: AppNotification) => {
     markNotificationRead(notif.id);
     if (notif.type === 'rental_completed') navigate('rentals');
     else if (notif.listingId) { setSelectedItemId(notif.listingId); navigate('explore'); }
+  };
+
+  const handleMarkReturned = async (e: React.MouseEvent, requestId: string) => {
+    e.stopPropagation();
+    setActionError(null);
+    setActingRequestId(requestId);
+    const result = await markReturned(requestId);
+    setActingRequestId(null);
+    if (result?.error) { setActionError(result.error); setTimeout(() => setActionError(null), 4000); }
+  };
+
+  const handleChat = (e: React.MouseEvent, requestId: string) => {
+    e.stopPropagation();
+    setActiveChatRequestId(requestId);
+    navigate('messages');
   };
 
   const handleAccept = async (e: React.MouseEvent, requestId: string) => {
@@ -61,6 +79,7 @@ export function Notifications({ navigate }: Props) {
 
   const isPendingRequest = (n: AppNotification) => n.type === 'new_request' && n.requestId;
   const isResolvedRequest = (n: AppNotification) => (n.type === 'accepted' || n.type === 'rejected') && n.requestId;
+  const isAcceptedRequest = (n: AppNotification) => n.type === 'accepted' && n.requestId && acceptedRequestIds.has(n.requestId);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 md:px-6 md:py-8">
@@ -120,7 +139,21 @@ export function Notifications({ navigate }: Props) {
                     </div>
                   )}
 
-                  {resolved && (
+                  {isAcceptedRequest(notif) && (
+                    <div className="mt-3 flex gap-2">
+                      <button onClick={(e) => handleChat(e, notif.requestId!)}
+                        className="flex items-center gap-1.5 rounded-full bg-lavender-50 px-4 py-1.5 text-xs font-semibold text-lavender-700 transition-colors hover:bg-lavender-100">
+                        <MessageCircle className="h-3.5 w-3.5" /> Chat
+                      </button>
+                      <button onClick={(e) => handleMarkReturned(e, notif.requestId!)} disabled={actingRequestId === notif.requestId}
+                        className="flex items-center gap-1.5 rounded-full bg-babyblue-500 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-babyblue-600 disabled:opacity-50">
+                        {actingRequestId === notif.requestId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PackageCheck className="h-3.5 w-3.5" />}
+                        Mark Returned
+                      </button>
+                    </div>
+                  )}
+
+                  {resolved && !isAcceptedRequest(notif) && (
                     <div className="mt-2 flex items-center gap-1.5 text-[11px] font-medium text-gray-400">
                       {notif.type === 'accepted' ? <><CheckCircle2 className="h-3 w-3 text-mint-500" /> You accepted this request</> : <><XCircle className="h-3 w-3 text-red-400" /> You rejected this request</>}
                     </div>

@@ -33,8 +33,14 @@ export function VerifiedBadge({ verified }: { verified: boolean }) {
   );
 }
 
-export function formatPrice(pricePerDay: number, pricingType: 'hour' | 'day' = 'day'): string {
-  if (pricePerDay === 0) return 'Free';
+export function formatPrice(pricePerDay: number, pricingType: 'hour' | 'day' = 'day', pricePerHour?: number): string {
+  if (pricePerDay === 0 && (!pricePerHour || pricePerHour === 0)) return 'Free';
+  if (pricePerHour && pricePerHour > 0 && pricePerDay > 0) {
+    return `₹${pricePerHour}/hour · ₹${pricePerDay}/day`;
+  }
+  if (pricingType === 'hour' && pricePerHour && pricePerHour > 0) {
+    return `₹${pricePerHour}/hour`;
+  }
   return `₹${pricePerDay}/${pricingType === 'hour' ? 'hour' : 'day'}`;
 }
 
@@ -47,7 +53,11 @@ export function formatRentalDuration(startDate: string, endDate: string): string
   if (!startDate || !endDate) return '—';
   const start = new Date(startDate);
   const end = new Date(endDate);
-  const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+  const diffMs = end.getTime() - start.getTime();
+  if (diffMs <= 0) return '—';
+  const hours = Math.round(diffMs / (1000 * 60 * 60));
+  if (hours < 24) return `${hours} ${hours === 1 ? 'Hour' : 'Hours'}`;
+  const days = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
   return `${days} ${days === 1 ? 'Day' : 'Days'}`;
 }
 

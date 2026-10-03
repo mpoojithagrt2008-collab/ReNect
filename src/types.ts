@@ -20,6 +20,7 @@ export interface Item {
   description: string;
   condition: Condition;
   pricePerDay: number;
+  pricePerHour: number;
   pricingType: PricingType;
   location: string;
   image: string;

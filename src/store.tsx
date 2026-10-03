@@ -31,6 +31,7 @@ interface AppContextType {
     description: string;
     condition: Condition;
     pricePerDay: number;
+    pricePerHour: number;
     pricingType: 'hour' | 'day';
     location: string;
     imageFile: File | null;
@@ -115,6 +116,7 @@ function parseItem(row: any, ownerName: string, ownerVerified: boolean, ownerStu
     description: row.description,
     condition: row.condition as Condition,
     pricePerDay: row.price_per_day,
+    pricePerHour: row.price_per_hour || 0,
     pricingType: (row.pricing_type as 'hour' | 'day') || 'day',
     location: row.location,
     image: row.image_url || PLACEHOLDER_IMAGES[(row.category as Category) || 'Other'],
@@ -1308,6 +1310,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     description: string;
     condition: Condition;
     pricePerDay: number;
+    pricePerHour: number;
     pricingType: 'hour' | 'day';
     location: string;
     imageFile: File | null;
@@ -1333,6 +1336,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       category: data.category,
       condition: data.condition,
       price_per_day: data.pricePerDay,
+      price_per_hour: data.pricePerHour,
       pricing_type: data.pricingType,
       location: data.location || 'Campus',
       image_url: imageUrl,

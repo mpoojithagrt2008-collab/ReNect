@@ -64,7 +64,7 @@ export function ItemCard({ item, onClick, isFavorite, onToggleFavorite, rating }
           )}
           <div className="mt-auto flex items-center justify-between pt-2">
             <span className="text-base font-bold text-lavender-600">
-              {formatPrice(item.pricePerDay, item.pricingType)}
+              {formatPrice(item.pricePerDay, item.pricingType, item.pricePerHour)}
             </span>
             <span className="rounded-full bg-lavender-50 px-2.5 py-0.5 text-xs font-medium text-lavender-600">{item.category}</span>
           </div>
