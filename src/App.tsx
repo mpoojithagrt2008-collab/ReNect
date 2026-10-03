@@ -11,10 +11,18 @@ import { Messages } from './pages/Messages';
 import { Notifications } from './pages/Notifications';
 import { Favorites } from './pages/Favorites';
 import { Profile } from './pages/Profile';
+import { Onboarding, hasSeenOnboarding } from './components/Onboarding';
+import { Welcome } from './pages/Welcome';
+
+type OnboardingState = 'animation' | 'welcome' | 'done';
 
 function AppContent() {
   const { user, authLoading } = useApp();
   const [page, setPage] = useState<Page>('home');
+
+  const initialOnboardingState: OnboardingState =
+    hasSeenOnboarding() ? 'done' : 'animation';
+  const [onboardingState, setOnboardingState] = useState<OnboardingState>(initialOnboardingState);
 
   if (authLoading) {
     return (
@@ -27,6 +35,19 @@ function AppContent() {
           <span className="text-sm font-medium">Loading ReNect...</span>
         </div>
       </div>
+    );
+  }
+
+  if (onboardingState === 'animation' && !user) {
+    return <Onboarding onComplete={() => setOnboardingState('welcome')} />;
+  }
+
+  if (onboardingState === 'welcome' && !user) {
+    return (
+      <Welcome
+        onSignUp={() => setOnboardingState('done')}
+        onSignIn={() => setOnboardingState('done')}
+      />
     );
   }
 

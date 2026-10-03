@@ -31,3 +31,80 @@ body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* ============================================================
+   Onboarding animation keyframes
+   ============================================================ */
+
+@keyframes ob-letter-r {
+  0% { opacity: 0; transform: translateY(40px) scale(0.8); }
+  50% { opacity: 1; transform: translateY(-8px) scale(1.05); }
+  70% { transform: translateY(4px) scale(0.98); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes ob-letter-e1 {
+  0% { opacity: 0; transform: translateY(-70px) scale(0.8); }
+  55% { opacity: 1; transform: translateY(6px) scale(1.05); }
+  75% { transform: translateY(-3px) scale(0.98); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes ob-letter-n {
+  0% { opacity: 0; transform: translateX(100px) scale(0.8); }
+  55% { opacity: 1; transform: translateX(-8px) scale(1.05); }
+  75% { transform: translateX(4px) scale(0.98); }
+  100% { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+@keyframes ob-letter-e2 {
+  0% { opacity: 0; transform: translateY(75px) scale(0.8); }
+  55% { opacity: 1; transform: translateY(-6px) scale(1.05); }
+  75% { transform: translateY(3px) scale(0.98); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes ob-letter-c {
+  0% { opacity: 0; transform: translateX(-100px) scale(0.8); }
+  55% { opacity: 1; transform: translateX(8px) scale(1.05); }
+  75% { transform: translateX(-4px) scale(0.98); }
+  100% { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+@keyframes ob-letter-t {
+  0% { opacity: 0; transform: translateY(-85px) rotate(4deg) scale(0.8); }
+  55% { opacity: 1; transform: translateY(6px) rotate(-1deg) scale(1.05); }
+  75% { transform: translateY(-3px) rotate(0.5deg) scale(0.98); }
+  100% { opacity: 1; transform: translateY(0) rotate(0deg) scale(1); }
+}
+
+@keyframes ob-logo-settle {
+  0% { transform: scale(0.98); }
+  60% { transform: scale(1.015); }
+  100% { transform: scale(1); }
+}
+
+@keyframes ob-leaf-fall {
+  0% { opacity: 0; transform: translate(0, -120px) rotate(-8deg) scale(0.6); }
+  15% { opacity: 1; }
+  25% { transform: translate(-18px, -70px) rotate(10deg) scale(0.8); }
+  50% { transform: translate(14px, -20px) rotate(-7deg) scale(0.9); }
+  75% { transform: translate(-10px, 8px) rotate(5deg) scale(0.95); }
+  100% { opacity: 1; transform: translate(0, 0) rotate(0deg) scale(1); }
+}
+
+@keyframes ob-tagline {
+  0% { opacity: 0; transform: translateY(14px) scale(0.95); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes ob-start-button {
+  0% { opacity: 0; transform: translateY(10px) scale(0.92); }
+  70% { opacity: 1; transform: translateY(0) scale(1.02); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes ob-fade-out {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
