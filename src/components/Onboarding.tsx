@@ -38,11 +38,13 @@ export function markOnboardingComplete() {
   }
 }
 
-export function Onboarding({ onComplete }: { onComplete: () => void }) {
+export function Onboarding({ onComplete }: { onComplete: (toWelcome: boolean) => void }) {
   const [animationComplete, setAnimationComplete] = useState(false);
   const [fadingOut, setFadingOut] = useState(false);
   const [pressed, setPressed] = useState(false);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  const returningUser = hasSeenOnboarding();
 
   useEffect(() => {
     const t = setTimeout(() => setAnimationComplete(true), ANIMATION_COMPLETE);
@@ -53,13 +55,23 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
     };
   }, []);
 
+  useEffect(() => {
+    if (!returningUser) return;
+    const t = setTimeout(() => {
+      setFadingOut(true);
+      setTimeout(() => onComplete(false), 400);
+    }, ANIMATION_COMPLETE + 400);
+    timersRef.current.push(t);
+    return () => clearTimeout(t);
+  }, [returningUser, onComplete]);
+
   const handleStart = () => {
     if (!animationComplete || pressed) return;
     setPressed(true);
     markOnboardingComplete();
     setTimeout(() => {
       setFadingOut(true);
-      setTimeout(onComplete, 400);
+      setTimeout(() => onComplete(true), 400);
     }, 200);
   };
 
@@ -115,7 +127,8 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
         Rent &bull; Reuse &bull; Connect
       </p>
 
-      {/* Start button */}
+      {/* Start button — only for first-time users */}
+      {!returningUser && (
       <button
         onClick={handleStart}
         disabled={!animationComplete}
@@ -131,6 +144,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
         Get Started
         <ArrowRight className="h-4 w-4" />
       </button>
+      )}
 
       {/* Subtle decorative dots */}
       <div className="pointer-events-none absolute bottom-12 left-1/2 -translate-x-1/2 flex gap-1.5 opacity-30">

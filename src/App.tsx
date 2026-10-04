@@ -11,7 +11,7 @@ import { Messages } from './pages/Messages';
 import { Notifications } from './pages/Notifications';
 import { Favorites } from './pages/Favorites';
 import { Profile } from './pages/Profile';
-import { Onboarding, hasSeenOnboarding } from './components/Onboarding';
+import { Onboarding } from './components/Onboarding';
 import { Welcome } from './pages/Welcome';
 import { CompleteProfile } from './components/CompleteProfile';
 
@@ -21,9 +21,7 @@ function AppContent() {
   const { user, authLoading, needsProfileSetup } = useApp();
   const [page, setPage] = useState<Page>('home');
 
-  const initialOnboardingState: OnboardingState =
-    hasSeenOnboarding() ? 'done' : 'animation';
-  const [onboardingState, setOnboardingState] = useState<OnboardingState>(initialOnboardingState);
+  const [onboardingState, setOnboardingState] = useState<OnboardingState>('animation');
 
   if (authLoading) {
     return (
@@ -40,7 +38,11 @@ function AppContent() {
   }
 
   if (onboardingState === 'animation' && !user) {
-    return <Onboarding onComplete={() => setOnboardingState('welcome')} />;
+    return (
+      <Onboarding
+        onComplete={(toWelcome: boolean) => setOnboardingState(toWelcome ? 'welcome' : 'done')}
+      />
+    );
   }
 
   if (onboardingState === 'welcome' && !user) {
