@@ -109,7 +109,7 @@ export interface ReturnRecord {
   requestId: string;
   listingId: string;
   borrowerId: string;
-  returnPhotoUrl: string;
+  returnPhotoUrl: string | null;
   returnCondition: ReturnCondition;
   returnNote: string;
   status: ReturnStatus;

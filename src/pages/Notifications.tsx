@@ -44,7 +44,7 @@ export function Notifications({ navigate }: Props) {
     requests.filter((r) => r.status === 'pending' && r.ownerId === user?.id).map((r) => r.id)
   );
   const acceptedRequestIds = new Set(
-    requests.filter((r) => r.status === 'accepted' && r.ownerId === user?.id).map((r) => r.id)
+    requests.filter((r) => (r.status === 'accepted' || r.status === 'completed') && r.ownerId === user?.id).map((r) => r.id)
   );
 
   const handleClick = (notif: AppNotification) => {
@@ -104,16 +104,15 @@ export function Notifications({ navigate }: Props) {
     e.stopPropagation();
     const returnRecord = returnsMap[requestId];
     if (returnRecord) {
-      markNotificationRead(
-        notifications.find((n) => n.requestId === requestId && n.type === 'return_submitted')?.id || ''
-      );
+      const notifId = notifications.find((n) => n.requestId === requestId && n.type === 'return_submitted')?.id;
+      if (notifId) markNotificationRead(notifId);
       setReviewingReturnId(returnRecord.id);
     }
   };
 
   const isPendingRequest = (n: AppNotification) => n.type === 'new_request' && n.requestId && pendingRequestIds.has(n.requestId);
-  const isResolvedRequest = (n: AppNotification) => (n.type === 'accepted' || n.type === 'rejected') && n.requestId;
-  const isAcceptedRequest = (n: AppNotification) => n.type === 'accepted' && n.requestId && acceptedRequestIds.has(n.requestId);
+  const isResolvedRequest = (n: AppNotification) => (n.type === 'accepted' || n.type === 'rejected' || n.type === 'available') && n.requestId;
+  const isAcceptedRequest = (n: AppNotification) => (n.type === 'accepted' || n.type === 'available') && n.requestId && acceptedRequestIds.has(n.requestId);
   const isStalePending = (n: AppNotification) => n.type === 'new_request' && n.requestId && !pendingRequestIds.has(n.requestId);
   const isRequestCancelled = (n: AppNotification) => n.type === 'request_cancelled' && n.requestId;
   const isReturnSubmitted = (n: AppNotification) => n.type === 'return_submitted' && n.requestId && returnsMap[n.requestId];
@@ -215,7 +214,7 @@ export function Notifications({ navigate }: Props) {
 
                   {resolved && !isAcceptedRequest(notif) && (
                     <div className="mt-2 flex items-center gap-1.5 text-[11px] font-medium text-gray-400">
-                      {notif.type === 'accepted' ? <><CheckCircle2 className="h-3 w-3 text-mint-500" /> You accepted this request</> : <><XCircle className="h-3 w-3 text-red-400" /> You rejected this request</>}
+                      {notif.type === 'accepted' ? <><CheckCircle2 className="h-3 w-3 text-mint-500" /> You accepted this request</> : notif.type === 'available' ? <><Recycle className="h-3 w-3 text-babyblue-500" /> Rental period ended — awaiting return</> : <><XCircle className="h-3 w-3 text-red-400" /> You rejected this request</>}
                     </div>
                   )}
 

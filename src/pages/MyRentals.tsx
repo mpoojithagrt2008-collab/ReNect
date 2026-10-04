@@ -66,7 +66,7 @@ export function MyRentals({ navigate }: Props) {
     if (!reviewingReq) return;
     setReviewError(null);
     const result = await submitReview(reviewingReq.id, reviewingReq.listingId, rating, feedback);
-    if (result.error) { setReviewError(result.error); }
+    if (result.error) { setReviewError(result.error); setTimeout(() => setReviewError(null), 4000); }
     else { setReviewSuccess('Review submitted successfully!'); setTimeout(() => setReviewSuccess(null), 3000); setReviewingReq(null); }
   };
 
@@ -201,7 +201,7 @@ export function MyRentals({ navigate }: Props) {
       )}
 
       {reviewingReq && (
-        <RatingReview itemName={reviewingReq.itemName} ownerName={reviewingReq.ownerName} onSubmit={handleReviewSubmit} onClose={() => { setReviewingReq(null); setReviewError(null); }} />
+        <RatingReview itemName={reviewingReq.itemName} ownerName={reviewingReq.ownerName} ownerStudentId={profilesMap[reviewingReq.ownerId]?.studentId} onSubmit={handleReviewSubmit} onClose={() => { setReviewingReq(null); setReviewError(null); }} />
       )}
       {returningReq && (
         <ReturnItemModal itemName={returningReq.itemName} onSubmit={handleReturnSubmit} onClose={() => setReturningReq(null)} />

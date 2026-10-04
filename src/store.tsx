@@ -11,6 +11,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
 import type { Item, BorrowRequest, UserProfile, RequestStatus, Availability, AppNotification, ChatMessage, Favorite, Review, ListingRating, ReturnRecord, DamagePenalty, PaymentRecord, ReturnCondition, PaymentMethod } from './types';
 import { PLACEHOLDER_IMAGES } from './data';
+import { formatOwnerName } from './components/ui';
 import type { Category, Condition, PricingType } from './types';
 
 interface AppContextType {
@@ -619,14 +620,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const fetchReturns = useCallback(async () => {
     const userId = sessionRef.current?.user?.id;
     if (!userId) return;
-    const { data, error } = await supabase
+    const { data: ownReqs } = await supabase
+      .from('rent_requests')
+      .select('id')
+      .eq('owner_id', userId);
+    const ownReqIds = (ownReqs || []).map((r: any) => r.id);
+    const { data: borrowerReturns } = await supabase
       .from('returns')
       .select('id, request_id, listing_id, borrower_id, return_photo_url, return_condition, return_note, status, created_at')
-      .or(`borrower_id.eq.${userId}`)
+      .eq('borrower_id', userId)
       .order('created_at', { ascending: false });
-    if (error || !data) { setReturns([]); return; }
-    const ownReqIds = requests.filter(r => r.ownerId === userId).map(r => r.id);
-    let allReturns = [...data];
+    let allReturns = [...(borrowerReturns || [])];
     if (ownReqIds.length > 0) {
       const { data: ownerReturns } = await supabase
         .from('returns')
@@ -648,7 +652,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       createdAt: r.created_at,
     }));
     setReturns(parsed);
-  }, [requests]);
+  }, []);
 
   const getReturnPhotoUrl = useCallback(async (requestId: string): Promise<string | null> => {
     const { data } = await supabase
@@ -790,7 +794,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         status: 'submitted',
       });
       if (insertError) {
-        if (insertError.code === '23505') return { error: 'You have already submitted a return for this rental.' };
+        if (insertError.code === '23505') {
+          await supabase.storage.from('return-photos').remove([filePath]);
+          return { error: 'You have already submitted a return for this rental.' };
+        }
+        await supabase.storage.from('return-photos').remove([filePath]);
         return { error: 'Failed to submit return.' };
       }
       if (ownerId) {
@@ -1110,7 +1118,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .channel('returns-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'returns' }, () => {
         fetchReturns();
-        fetchNotifications();
       })
       .subscribe();
 
@@ -1118,7 +1125,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .channel('penalties-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'damage_penalties' }, () => {
         fetchPenalties();
-        fetchNotifications();
       })
       .subscribe();
 
@@ -1126,7 +1132,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .channel('payments-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, () => {
         fetchPayments();
-        fetchNotifications();
       })
       .subscribe();
 
@@ -1271,7 +1276,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           .eq('id', data.user.id);
       }
 
-      return { error: null, needsEmailConfirmation: true };
+      return { error: null, needsEmailConfirmation: false };
     } catch (err: any) {
       if (import.meta.env.DEV) console.error('[signup] unexpected error:', err);
       if (isNetworkError(err)) {
@@ -1531,7 +1536,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       actor_id: user.id,
       type: 'new_request',
       title: 'New rental request',
-      body: `${user.fullName} requested to borrow "${listingTitle}". Duration: ${duration}.`,
+      body: `${formatOwnerName(user.fullName, user.studentId)} requested to borrow "${listingTitle}". Duration: ${duration}.`,
       listing_id: req.listingId,
     });
 
@@ -1597,13 +1602,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .maybeSingle();
     if (fetchErr || !req) return { error: 'Request not found.' };
     if (req.owner_id !== user.id) return { error: 'Only the owner can mark an item as returned.' };
-    if (req.status !== 'accepted') return { error: 'Only accepted rentals can be marked as returned.' };
+    if (req.status !== 'accepted' && req.status !== 'completed') return { error: 'Only active or completed rentals can be marked as returned.' };
+    const { data: existingReturn } = await supabase
+      .from('returns')
+      .select('id, status')
+      .eq('request_id', requestId)
+      .maybeSingle();
+    if (existingReturn && existingReturn.status === 'submitted') {
+      return { error: 'This rental has a pending return review. Please use "Review Return" to confirm it.' };
+    }
     const { error: updateErr } = await supabase
       .from('rent_requests')
       .update({ status: 'completed' })
       .eq('id', requestId);
     if (updateErr) return { error: `Failed to update: ${updateErr.message}` };
     await supabase.from('listings').update({ availability: 'available' }).eq('id', req.listing_id);
+    if (existingReturn && existingReturn.status !== 'reviewed') {
+      await supabase.from('returns').update({ status: 'reviewed' }).eq('id', existingReturn.id);
+    }
     await supabase.from('notifications').insert({
       user_id: req.requester_id,
       actor_id: user.id,
@@ -1614,10 +1630,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       request_id: requestId,
     });
     fetchRequests(user.id);
+    fetchReturns();
     fetchListings();
     fetchNotifications();
     return { error: null };
-  }, [user, fetchRequests, fetchListings, fetchNotifications]);
+  }, [user, fetchRequests, fetchReturns, fetchListings, fetchNotifications]);
 
   return (
     <AppContext.Provider

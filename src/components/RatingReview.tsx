@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import { Star, X, Loader2 } from 'lucide-react';
+import { formatOwnerName } from './ui';
 
 interface Props {
   itemName: string;
   ownerName: string;
+  ownerStudentId?: string;
   onSubmit: (rating: number, reviewText: string) => Promise<void> | void;
   onClose: () => void;
 }
 
-export function RatingReview({ itemName, ownerName, onSubmit, onClose }: Props) {
+export function RatingReview({ itemName, ownerName, ownerStudentId, onSubmit, onClose }: Props) {
   const [rating, setRating] = useState(0);
   const [hover, setHover] = useState(0);
   const [reviewText, setReviewText] = useState('');
@@ -34,7 +36,7 @@ export function RatingReview({ itemName, ownerName, onSubmit, onClose }: Props) 
 
         <div className="mb-4 rounded-xl bg-gray-50 px-4 py-3">
           <p className="text-sm font-semibold text-gray-900">{itemName}</p>
-          <p className="text-xs text-gray-500">From {ownerName}</p>
+          <p className="text-xs text-gray-500">From {formatOwnerName(ownerName, ownerStudentId || '')}</p>
         </div>
 
         <form onSubmit={handleSubmit}>

@@ -81,7 +81,7 @@ export function Home({ navigate }: Props) {
           Welcome back
         </div>
         <h1 className="mt-1.5 text-2xl font-bold tracking-tight md:text-3xl">
-          Hi {user?.fullName?.split(' ')[0]}!
+          Hi {user?.fullName?.split(' ')[0]}{user?.studentId ? ` (${user.studentId})` : ''}!
         </h1>
         <p className="mt-1.5 max-w-lg text-sm text-lavender-50/80 md:text-base">
           Find what you need on campus — borrow, rent, or reuse from fellow students instead of buying new.

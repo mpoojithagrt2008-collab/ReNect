@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Plus, Package, Check, X, AlertTriangle,
   Camera, Image as ImageIcon, Loader2, AlertCircle, Trash2,
@@ -6,11 +6,14 @@ import {
 import { useApp } from '../store';
 import { CATEGORIES, CONDITIONS } from '../data';
 import { ItemCard } from '../components/ItemCard';
-import type { Category, Condition, PricingType } from '../types';
+import { ItemDetails } from './ItemDetails';
+import type { Category, Condition, PricingType, Item } from '../types';
 
 export function MyItems({ navigate }: { navigate: (p: import('../components/Navigation').Page) => void }) {
   const { user, items, addListing, deleteListing } = useApp();
   const [showForm, setShowForm] = useState(false);
+  const [activeTab, setActiveTab] = useState<'available' | 'unavailable'>('available');
+  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [name, setName] = useState('');
   const [category, setCategory] = useState<Category>('Books');
   const [description, setDescription] = useState('');
@@ -31,6 +34,17 @@ export function MyItems({ navigate }: { navigate: (p: import('../components/Navi
   const galleryInputRef = useRef<HTMLInputElement>(null);
 
   const myListings = useMemo(() => items.filter((i) => i.ownerId === user?.id), [items, user]);
+  const availableListings = useMemo(() => myListings.filter((i) => i.availability === 'available'), [myListings]);
+  const unavailableListings = useMemo(() => myListings.filter((i) => i.availability !== 'available'), [myListings]);
+
+  useEffect(() => {
+    if (selectedItem) {
+      const fresh = items.find((i) => i.id === selectedItem.id);
+      if (fresh && fresh.availability !== selectedItem.availability) {
+        setSelectedItem(fresh);
+      }
+    }
+  }, [items, selectedItem]);
 
   const resetForm = () => {
     setName(''); setCategory('Books'); setDescription(''); setCondition('Good');
@@ -56,10 +70,17 @@ export function MyItems({ navigate }: { navigate: (p: import('../components/Navi
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setSubmitError(null); setSubmitting(true);
+    const hourly = pricePerHour ? Number(pricePerHour) : 0;
+    const daily = pricePerDay ? Number(pricePerDay) : 0;
+    if (hourly === 0 && daily === 0) {
+      setSubmitting(false);
+      setSubmitError('Please set at least one price (hourly or daily).');
+      return;
+    }
     const result = await addListing({
       name, category, description, condition,
-      pricePerHour: pricePerHour ? Number(pricePerHour) : 0,
-      pricePerDay: pricePerDay ? Number(pricePerDay) : 0,
+      pricePerHour: hourly,
+      pricePerDay: daily,
       pricingType,
       location: location || 'Campus', imageFile,
     });
@@ -223,19 +244,60 @@ export function MyItems({ navigate }: { navigate: (p: import('../components/Navi
       {/* Listings — only items the current user has listed */}
       {myListings.length > 0 ? (
         <>
-          <h2 className="mb-3 text-sm font-semibold text-gray-600">Your listings ({myListings.length})</h2>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {myListings.map((item) => (
-              <div key={item.id} className="relative group">
-                <ItemCard item={item} onClick={() => {}} />
-                <button onClick={() => handleDeleteClick(item.id, item.name)}
-                  className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-red-500 opacity-0 shadow-soft transition-all hover:bg-red-50 group-hover:opacity-100"
-                  title="Delete item">
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-            ))}
+          {/* Tabs */}
+          <div className="mb-4 flex gap-2">
+            <button onClick={() => setActiveTab('available')}
+              className={`flex items-center gap-1.5 rounded-2xl px-4 py-2 text-sm font-semibold transition-all ${activeTab === 'available' ? 'bg-lavender-100 text-lavender-700' : 'text-gray-500 hover:bg-lavender-50'}`}>
+              Available ({availableListings.length})
+            </button>
+            <button onClick={() => setActiveTab('unavailable')}
+              className={`flex items-center gap-1.5 rounded-2xl px-4 py-2 text-sm font-semibold transition-all ${activeTab === 'unavailable' ? 'bg-lavender-100 text-lavender-700' : 'text-gray-500 hover:bg-lavender-50'}`}>
+              Unavailable ({unavailableListings.length})
+            </button>
           </div>
+
+          {activeTab === 'available' ? (
+            availableListings.length > 0 ? (
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+                {availableListings.map((item) => (
+                  <div key={item.id} className="relative group">
+                    <ItemCard item={item} onClick={() => {}} />
+                    <button onClick={() => handleDeleteClick(item.id, item.name)}
+                      className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-red-500 opacity-0 shadow-soft transition-all hover:bg-red-50 group-hover:opacity-100"
+                      title="Delete item">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-lavender-200 bg-white py-16 text-center">
+                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-mint-50">
+                  <Package className="h-8 w-8 text-mint-400" />
+                </div>
+                <h3 className="text-base font-semibold text-gray-800">No available items</h3>
+                <p className="mt-1 max-w-xs text-sm text-gray-400">All your items are currently rented out.</p>
+              </div>
+            )
+          ) : (
+            unavailableListings.length > 0 ? (
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+                {unavailableListings.map((item) => (
+                  <div key={item.id} className="relative group">
+                    <ItemCard item={item} onClick={() => setSelectedItem(item)} />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-lavender-200 bg-white py-16 text-center">
+                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-babyblue-50">
+                  <Package className="h-8 w-8 text-babyblue-400" />
+                </div>
+                <h3 className="text-base font-semibold text-gray-800">No rented items</h3>
+                <p className="mt-1 max-w-xs text-sm text-gray-400">None of your items are currently rented out.</p>
+              </div>
+            )
+          )}
         </>
       ) : (
         <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-lavender-200 bg-white py-16 text-center">
@@ -249,6 +311,11 @@ export function MyItems({ navigate }: { navigate: (p: import('../components/Navi
             <Plus className="h-4 w-4" /> List an Item
           </button>
         </div>
+      )}
+
+      {/* Item details view for unavailable items */}
+      {selectedItem && (
+        <ItemDetails item={selectedItem} onBack={() => setSelectedItem(null)} />
       )}
 
       {/* Delete confirmation */}

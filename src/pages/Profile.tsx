@@ -1,16 +1,18 @@
 import { useState, useRef } from 'react';
 import {
   GraduationCap, Mail, IdCard, BadgeCheck, Package, Repeat, Trash2, AlertTriangle, X,
-  Loader2, Camera, Image as ImageIcon, Heart, CalendarCheck, Settings,
+  Loader2, Camera, Image as ImageIcon, Heart, CalendarCheck, Settings, LogOut,
 } from 'lucide-react';
 import { useApp } from '../store';
 import type { Page } from '../components/Navigation';
+import { formatOwnerName } from '../components/ui';
 
 interface Props { navigate: (p: Page) => void; }
 
 export function Profile({ navigate }: Props) {
-  const { user, items, requests, deleteAccount, updateAvatar, removeAvatar } = useApp();
+  const { user, items, requests, deleteAccount, updateAvatar, removeAvatar, logout } = useApp();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
   const [confirmText, setConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -111,7 +113,7 @@ export function Profile({ navigate }: Props) {
           )}
 
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold tracking-tight text-gray-800">{user.fullName}</h1>
+            <h1 className="text-xl font-bold tracking-tight text-gray-800">{formatOwnerName(user.fullName, user.studentId)}</h1>
             <span className="inline-flex items-center gap-1 rounded-full bg-mint-50 px-2.5 py-0.5 text-xs font-medium text-mint-600">
               <BadgeCheck className="h-4 w-4" /> Verified
             </span>
@@ -187,12 +189,42 @@ export function Profile({ navigate }: Props) {
           </div>
         )}
 
+        <button onClick={() => setShowSignOutConfirm(true)}
+          className="mb-3 flex items-center gap-2 rounded-2xl border border-lavender-200 bg-lavender-50 px-4 py-2.5 text-sm font-semibold text-lavender-700 transition-colors hover:bg-lavender-100">
+          <LogOut className="h-4 w-4" /> Sign Out
+        </button>
+
         <button onClick={() => setShowDeleteConfirm(true)}
           className="flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-600 transition-colors hover:bg-red-100">
           <Trash2 className="h-4 w-4" /> Delete Account
         </button>
         <p className="mt-2 text-[11px] text-gray-400">This will permanently remove your account, listed items, rental history, and profile data.</p>
       </div>
+
+      {/* Sign out confirmation */}
+      {showSignOutConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+          <div className="w-full max-w-sm rounded-4xl bg-white p-6 shadow-soft-lg">
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-lavender-50">
+              <LogOut className="h-6 w-6 text-lavender-600" />
+            </div>
+            <h2 className="text-lg font-bold text-gray-800">Sign out?</h2>
+            <p className="mt-2 text-sm text-gray-500">
+              Are you sure you want to sign out? You'll need to sign in again to access your rentals, items, and messages.
+            </p>
+            <div className="mt-6 flex gap-3">
+              <button onClick={() => { logout(); setShowSignOutConfirm(false); }}
+                className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-lavender-600 py-2.5 text-sm font-semibold text-white transition-all hover:bg-lavender-700 active:scale-[0.98]">
+                <LogOut className="h-4 w-4" /> Sign Out
+              </button>
+              <button onClick={() => setShowSignOutConfirm(false)}
+                className="rounded-2xl border border-lavender-100 bg-white px-5 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-lavender-50">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete account confirmation */}
       {showDeleteConfirm && (

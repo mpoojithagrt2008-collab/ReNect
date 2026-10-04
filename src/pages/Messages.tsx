@@ -75,7 +75,7 @@ export function Messages({ navigate }: Props) {
       });
 
     return () => { cancelled = true; };
-  }, [myConversations.length, user?.id, messages.length]);
+  }, [myConversations.map((r) => r.id).join(','), user?.id, messages.length]);
 
   useEffect(() => {
     if (activeChatRequestId) fetchMessages(activeChatRequestId);

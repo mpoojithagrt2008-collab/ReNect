@@ -64,7 +64,7 @@ export function Navigation({ current, navigate }: Props) {
             </button>
             <button onClick={() => navigate('profile')} className={`flex items-center gap-1.5 rounded-full p-0.5 pr-2 transition-all ${current === 'profile' ? 'bg-lavender-100' : 'hover:bg-lavender-50'}`}>
               <MiniAvatar url={user?.avatarUrl ?? null} name={user?.fullName ?? ''} />
-              <span className="text-sm font-medium text-gray-700">{user?.fullName?.split(' ')[0]}</span>
+              <span className="text-sm font-medium text-gray-700">{user?.fullName?.split(' ')[0]}{user?.studentId ? ` (${user.studentId})` : ''}</span>
             </button>
             <button onClick={logout} className="flex h-9 w-9 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500">
               <LogOut className="h-4.5 w-4.5" />

@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import {
-  ArrowLeft, MapPin, User, Tag, Calendar, MessageSquare, Send, CheckCircle2, Loader2, AlertCircle, Trash2, XCircle, Heart, Clock,
+  ArrowLeft, MapPin, User, Tag, Calendar, MessageSquare, Send, CheckCircle2, Loader2, AlertCircle, Trash2, XCircle, Heart, Clock, PackageCheck, IdCard, Mail, GraduationCap,
 } from 'lucide-react';
-import type { Item } from '../types';
+import type { Item, BorrowRequest, UserProfile, ReturnRecord } from '../types';
 import { useApp } from '../store';
 import { VerifiedBadge, ConditionBadge, formatPrice, StarRatingDisplay, formatOwnerName, formatRentalDuration } from '../components/ui';
+import { supabase } from '../lib/supabase';
 
 interface Props { item: Item; onBack: () => void; }
 
@@ -32,7 +33,7 @@ function formatDisplayDateTime(dateStr: string): string {
 }
 
 export function ItemDetails({ item, onBack }: Props) {
-  const { user, addRequest, deleteListing, favoriteIds, toggleFavorite, ratingsMap, fetchRating, reviews, fetchReviews } = useApp();
+  const { user, addRequest, deleteListing, favoriteIds, toggleFavorite, ratingsMap, fetchRating, reviews, fetchReviews, returnsMap } = useApp();
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -44,6 +45,9 @@ export function ItemDetails({ item, onBack }: Props) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [activeRental, setActiveRental] = useState<BorrowRequest | null>(null);
+  const [renterProfile, setRenterProfile] = useState<UserProfile | null>(null);
+  const [renterLoading, setRenterLoading] = useState(false);
 
   const isOwnItem = item.ownerId === user?.id;
   const isAvailable = item.availability === 'available';
@@ -69,7 +73,7 @@ export function ItemDetails({ item, onBack }: Props) {
     const start = new Date(startDate); const end = new Date(endDate);
     const diffMs = end.getTime() - start.getTime();
     if (diffMs <= 0) return 0;
-    return Math.round(diffMs / (1000 * 60 * 60));
+    return Math.ceil(diffMs / (1000 * 60 * 60));
   })();
 
   const rentalDurationLabel = (() => {
@@ -82,9 +86,11 @@ export function ItemDetails({ item, onBack }: Props) {
   const rentalTotal = (() => {
     if (rentalDurationHours <= 0) return 0;
     if (rentalDurationHours < 24) {
-      // Use hourly rate if available, otherwise fall back to daily rate prorated
       if (item.pricePerHour > 0) return rentalDurationHours * item.pricePerHour;
       return Math.ceil(rentalDurationHours / 24) * item.pricePerDay;
+    }
+    if (item.pricingType === 'hour' && item.pricePerHour > 0 && item.pricePerDay === 0) {
+      return rentalDurationHours * item.pricePerHour;
     }
     const days = Math.ceil(rentalDurationHours / 24);
     return days * item.pricePerDay;
@@ -96,6 +102,71 @@ export function ItemDetails({ item, onBack }: Props) {
   })();
 
   useEffect(() => { fetchRating(item.id); fetchReviews(item.id); }, [item.id]);
+
+  // Fetch current active renter for owner's unavailable item
+  useEffect(() => {
+    if (!isOwnItem || isAvailable) {
+      setActiveRental(null);
+      setRenterProfile(null);
+      return;
+    }
+    let mounted = true;
+    setRenterLoading(true);
+    (async () => {
+      const { data: req } = await supabase
+        .from('rent_requests')
+        .select('id, listing_id, owner_id, requester_id, start_date, end_date, status, message, created_at')
+        .eq('listing_id', item.id)
+        .eq('owner_id', user!.id)
+        .in('status', ['accepted', 'completed'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!mounted) return;
+      if (!req) {
+        setActiveRental(null);
+        setRenterProfile(null);
+        setRenterLoading(false);
+        return;
+      }
+      const rental: BorrowRequest = {
+        id: req.id,
+        listingId: req.listing_id,
+        itemName: item.name,
+        itemImage: item.image,
+        ownerId: req.owner_id,
+        ownerName: item.ownerName,
+        requesterId: req.requester_id,
+        requesterName: '',
+        startDate: req.start_date || '',
+        endDate: req.end_date || '',
+        message: req.message || '',
+        status: req.status,
+        createdAt: req.created_at,
+      };
+      setActiveRental(rental);
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, student_id, college, avatar_url')
+        .eq('id', req.requester_id)
+        .maybeSingle();
+      if (!mounted) return;
+      if (profile) {
+        setRenterProfile({
+          id: profile.id,
+          fullName: profile.full_name,
+          email: profile.email,
+          studentId: profile.student_id || '',
+          college: profile.college || '',
+          avatarUrl: profile.avatar_url || null,
+        });
+      } else {
+        setRenterProfile(null);
+      }
+      setRenterLoading(false);
+    })();
+    return () => { mounted = false; };
+  }, [item.id, item.availability, isOwnItem, isAvailable, user, item.name, item.image, item.ownerName]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setError(null); setSubmitting(true);
@@ -191,6 +262,108 @@ export function ItemDetails({ item, onBack }: Props) {
               </span>
             </div>
           </div>
+
+          {/* Current Renter section — only visible to the item owner when item is unavailable */}
+          {isOwnItem && !isAvailable && (
+            renterLoading ? (
+              <div className="flex items-center justify-center rounded-2xl border border-lavender-100 bg-white p-4 shadow-card">
+                <Loader2 className="h-5 w-5 animate-spin text-lavender-500" />
+                <span className="ml-2 text-sm text-gray-400">Loading renter details...</span>
+              </div>
+            ) : activeRental && renterProfile ? (
+              <div className="rounded-2xl border border-babyblue-100 bg-babyblue-50/30 p-4 shadow-card">
+                <div className="mb-3 flex items-center gap-2">
+                  <PackageCheck className="h-4.5 w-4.5 text-babyblue-600" />
+                  <h3 className="text-sm font-semibold text-gray-800">Current Renter</h3>
+                </div>
+
+                {/* Renter profile */}
+                <div className="mb-3 flex items-center gap-3 rounded-xl bg-white p-3">
+                  {renterProfile.avatarUrl ? (
+                    <img src={renterProfile.avatarUrl} alt={renterProfile.fullName} className="h-12 w-12 rounded-xl object-cover" />
+                  ) : (
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-lavender-100 text-lg font-bold text-lavender-600">
+                      {renterProfile.fullName.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-gray-800">
+                      {formatOwnerName(renterProfile.fullName, renterProfile.studentId)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Renter details */}
+                <div className="space-y-2.5">
+                  <div className="flex items-center gap-3 text-sm">
+                    <IdCard className="h-4 w-4 shrink-0 text-babyblue-500" />
+                    <span className="text-gray-400">College ID</span>
+                    <span className="ml-auto font-medium text-gray-800">{renterProfile.studentId || 'Not set'}</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-sm">
+                    <GraduationCap className="h-4 w-4 shrink-0 text-babyblue-500" />
+                    <span className="text-gray-400">College</span>
+                    <span className="ml-auto font-medium text-gray-800">{renterProfile.college || 'Not set'}</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-sm">
+                    <Mail className="h-4 w-4 shrink-0 text-babyblue-500" />
+                    <span className="text-gray-400">Email</span>
+                    <span className="ml-auto truncate font-medium text-gray-800">{renterProfile.email}</span>
+                  </div>
+                </div>
+
+                {/* Rental details */}
+                <div className="mt-4 space-y-2.5 border-t border-babyblue-100 pt-3">
+                  <div className="flex items-center gap-3 text-sm">
+                    <Calendar className="h-4 w-4 shrink-0 text-babyblue-500" />
+                    <span className="text-gray-400">Rental Start</span>
+                    <span className="ml-auto font-medium text-gray-800">{formatDisplayDateTime(activeRental.startDate)}</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-sm">
+                    <Calendar className="h-4 w-4 shrink-0 text-babyblue-500" />
+                    <span className="text-gray-400">Expected Return</span>
+                    <span className="ml-auto font-medium text-gray-800">{formatDisplayDateTime(activeRental.endDate)}</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-sm">
+                    <Clock className="h-4 w-4 shrink-0 text-babyblue-500" />
+                    <span className="text-gray-400">Duration</span>
+                    <span className="ml-auto font-medium text-gray-800">{formatRentalDuration(activeRental.startDate, activeRental.endDate)}</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-sm">
+                    <Tag className="h-4 w-4 shrink-0 text-babyblue-500" />
+                    <span className="text-gray-400">Rental Status</span>
+                    <span className={`ml-auto rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${
+                      activeRental.status === 'accepted' ? 'bg-mint-50 text-mint-700' :
+                      activeRental.status === 'completed' ? 'bg-amber-50 text-amber-700' :
+                      'bg-gray-100 text-gray-600'
+                    }`}>{activeRental.status}</span>
+                  </div>
+                  {returnsMap[activeRental.id] && (
+                    <div className="flex items-center gap-3 text-sm">
+                      <PackageCheck className="h-4 w-4 shrink-0 text-babyblue-500" />
+                      <span className="text-gray-400">Return Status</span>
+                      <span className={`ml-auto rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${
+                        returnsMap[activeRental.id].status === 'submitted' ? 'bg-babyblue-50 text-babyblue-700' :
+                        'bg-mint-50 text-mint-700'
+                      }`}>
+                        {returnsMap[activeRental.id].status === 'submitted' ? 'Pending review' : 'Reviewed'}
+                      </span>
+                    </div>
+                  )}
+                  {activeRental.message && (
+                    <div className="rounded-xl bg-white p-3">
+                      <p className="mb-1 text-xs text-gray-400">Renter's message</p>
+                      <p className="text-sm text-gray-700">{activeRental.message}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-center text-sm text-gray-500">
+                No active rental found for this item.
+              </div>
+            )
+          )}
 
           {error && (
             <div className="flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3">
