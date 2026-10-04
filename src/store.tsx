@@ -1454,18 +1454,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return { error: 'No active session.' };
 
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const response = await fetch(`${supabaseUrl}/functions/v1/delete-user`, {
+      const { error: deleteError } = await supabase.functions.invoke('delete-user', {
         method: 'POST',
+        body: {},
         headers: {
           Authorization: `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
         },
       });
 
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        return { error: body.error || 'Failed to delete account. Please try again.' };
+      if (deleteError) {
+        return { error: 'Failed to delete account. Please try again.' };
       }
 
       await supabase.auth.signOut();
