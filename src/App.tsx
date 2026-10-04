@@ -37,15 +37,11 @@ function AppContent() {
     );
   }
 
-  if (onboardingState === 'animation' && !user) {
-    return (
-      <Onboarding
-        onComplete={(toWelcome: boolean) => setOnboardingState(toWelcome ? 'welcome' : 'done')}
-      />
-    );
+  if (onboardingState === 'animation') {
+    return <Onboarding onComplete={() => setOnboardingState('welcome')} />;
   }
 
-  if (onboardingState === 'welcome' && !user) {
+  if (onboardingState === 'welcome') {
     return (
       <Welcome
         onSignUp={() => setOnboardingState('done')}

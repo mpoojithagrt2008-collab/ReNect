@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Leaf, ArrowRight } from 'lucide-react';
 
-const ONBOARDING_KEY = 'renect_onboarding_complete';
-
 const CAMPUS_IMAGE = 'https://images.pexels.com/photos/19554793/pexels-photo-19554793.jpeg?auto=compress&cs=tinysrgb&h=650&w=940';
 
 const LETTERS = [
@@ -22,29 +20,11 @@ const TAGLINE_START = LOGO_SETTLE_START + 450;
 const BUTTON_START = TAGLINE_START + 600;
 const ANIMATION_COMPLETE = BUTTON_START + 550;
 
-export function hasSeenOnboarding(): boolean {
-  try {
-    return localStorage.getItem(ONBOARDING_KEY) === 'true';
-  } catch {
-    return false;
-  }
-}
-
-export function markOnboardingComplete() {
-  try {
-    localStorage.setItem(ONBOARDING_KEY, 'true');
-  } catch {
-    // ignore
-  }
-}
-
-export function Onboarding({ onComplete }: { onComplete: (toWelcome: boolean) => void }) {
+export function Onboarding({ onComplete }: { onComplete: () => void }) {
   const [animationComplete, setAnimationComplete] = useState(false);
   const [fadingOut, setFadingOut] = useState(false);
   const [pressed, setPressed] = useState(false);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
-
-  const returningUser = hasSeenOnboarding();
 
   useEffect(() => {
     const t = setTimeout(() => setAnimationComplete(true), ANIMATION_COMPLETE);
@@ -55,23 +35,12 @@ export function Onboarding({ onComplete }: { onComplete: (toWelcome: boolean) =>
     };
   }, []);
 
-  useEffect(() => {
-    if (!returningUser) return;
-    const t = setTimeout(() => {
-      setFadingOut(true);
-      setTimeout(() => onComplete(false), 400);
-    }, ANIMATION_COMPLETE + 400);
-    timersRef.current.push(t);
-    return () => clearTimeout(t);
-  }, [returningUser, onComplete]);
-
   const handleStart = () => {
     if (!animationComplete || pressed) return;
     setPressed(true);
-    markOnboardingComplete();
     setTimeout(() => {
       setFadingOut(true);
-      setTimeout(() => onComplete(true), 400);
+      setTimeout(onComplete, 400);
     }, 200);
   };
 
@@ -127,8 +96,7 @@ export function Onboarding({ onComplete }: { onComplete: (toWelcome: boolean) =>
         Rent &bull; Reuse &bull; Connect
       </p>
 
-      {/* Start button — only for first-time users */}
-      {!returningUser && (
+      {/* Start button */}
       <button
         onClick={handleStart}
         disabled={!animationComplete}
@@ -144,7 +112,6 @@ export function Onboarding({ onComplete }: { onComplete: (toWelcome: boolean) =>
         Get Started
         <ArrowRight className="h-4 w-4" />
       </button>
-      )}
 
       {/* Subtle decorative dots */}
       <div className="pointer-events-none absolute bottom-12 left-1/2 -translate-x-1/2 flex gap-1.5 opacity-30">
