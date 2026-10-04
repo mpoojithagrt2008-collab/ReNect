@@ -3,13 +3,15 @@ import { Leaf, ArrowRight } from 'lucide-react';
 
 const ONBOARDING_KEY = 'renect_onboarding_complete';
 
+const CAMPUS_IMAGE = 'https://images.pexels.com/photos/19554793/pexels-photo-19554793.jpeg?auto=compress&cs=tinysrgb&h=650&w=940';
+
 const LETTERS = [
-  { char: 'R', className: 'ob-letter-r', delay: 200 },
-  { char: 'e', className: 'ob-letter-e1', delay: 750 },
-  { char: 'N', className: 'ob-letter-n', delay: 1250 },
-  { char: 'e', className: 'ob-letter-e2', delay: 1750 },
-  { char: 'C', className: 'ob-letter-c', delay: 2250 },
-  { char: 'T', className: 'ob-letter-t', delay: 2750 },
+  { char: 'R', className: 'ob-letter-r', delay: 200, isLavender: false },
+  { char: 'e', className: 'ob-letter-e1', delay: 750, isLavender: false },
+  { char: 'N', className: 'ob-letter-n', delay: 1250, isLavender: true },
+  { char: 'e', className: 'ob-letter-e2', delay: 1750, isLavender: true },
+  { char: 'c', className: 'ob-letter-c', delay: 2250, isLavender: true },
+  { char: 't', className: 'ob-letter-t', delay: 2750, isLavender: true },
 ];
 
 const LETTER_ANIM_MS = 700;
@@ -83,11 +85,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
                 animation: `${letter.className} ${LETTER_ANIM_MS}ms cubic-bezier(0.34, 1.56, 0.64, 1) ${letter.delay}ms both`,
               }}
             >
-              {letter.char === 'R' || letter.char === 'N' || letter.char === 'C' || letter.char === 'T' ? (
-                letter.char
-              ) : (
-                <span className="text-lavender-600">{letter.char}</span>
-              )}
+              <span className={letter.isLavender ? 'text-lavender-600' : ''}>{letter.char}</span>
             </span>
           ))}
         </h1>
@@ -103,7 +101,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
             animation: `ob-leaf-fall 600ms cubic-bezier(0.45, 0.05, 0.55, 0.95) ${LEAF_START}ms both`,
           }}
         >
-          <Leaf className="h-6 w-6 text-mint-500" strokeWidth={2.5} />
+          <Leaf className="h-6 w-6 text-lavender-500" strokeWidth={2.5} />
         </div>
       </div>
 
@@ -114,7 +112,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
           animation: `ob-tagline 550ms cubic-bezier(0.22, 1, 0.36, 1) ${TAGLINE_START}ms both`,
         }}
       >
-        Rent &bull; Share &bull; Connect
+        Rent &bull; Reuse &bull; Connect
       </p>
 
       {/* Start button */}
@@ -130,7 +128,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
             : 'none',
         }}
       >
-        START
+        Get Started
         <ArrowRight className="h-4 w-4" />
       </button>
 
@@ -143,3 +141,5 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
     </div>
   );
 }
+
+export { CAMPUS_IMAGE };

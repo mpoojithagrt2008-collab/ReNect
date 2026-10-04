@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Leaf, ArrowRight, GraduationCap, LogIn } from 'lucide-react';
+import { Leaf, ArrowRight } from 'lucide-react';
+import { CAMPUS_IMAGE } from '../components/Onboarding';
 
 export function Welcome({ onSignUp, onSignIn }: { onSignUp: () => void; onSignIn: () => void }) {
   const [transitioning, setTransitioning] = useState(false);
@@ -17,14 +18,30 @@ export function Welcome({ onSignUp, onSignIn }: { onSignUp: () => void; onSignIn
     >
       <div className="flex w-full max-w-sm flex-col items-center">
         {/* Logo */}
-        <div className="mb-3 flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-lavender-400 to-lavender-600 shadow-soft-lg">
-          <Leaf className="h-10 w-10 text-white" />
+        <div className="mb-3 flex flex-col items-center">
+          <h1 className="text-3xl font-extrabold tracking-tight text-gray-800">
+            Re<span className="text-lavender-600">Nect</span>
+          </h1>
+          <Leaf className="mt-1.5 h-5 w-5 text-lavender-500" strokeWidth={2.5} />
         </div>
-        <h1 className="mb-2 text-3xl font-extrabold tracking-tight text-gray-800">
-          Welcome to <span className="text-lavender-600">ReNeCT</span>
-        </h1>
-        <p className="mb-10 text-center text-sm text-gray-400">
-          Your campus community for borrowing, lending, and reusing. Let's get started.
+
+        {/* Campus image */}
+        <div className="mb-6 mt-4 w-full overflow-hidden rounded-3xl shadow-soft-lg">
+          <img
+            src={CAMPUS_IMAGE}
+            alt="College campus"
+            className="h-44 w-full object-cover"
+          />
+        </div>
+
+        {/* Heading */}
+        <h2 className="mb-3 text-center text-2xl font-bold tracking-tight text-gray-800">
+          Welcome to ReNect!
+        </h2>
+
+        {/* Explanation */}
+        <p className="mb-8 text-center text-sm leading-relaxed text-gray-500">
+          ReNect allows students to rent out their items to others or rent the items they need, all within our campus.
         </p>
 
         {/* Action buttons */}
@@ -33,17 +50,16 @@ export function Welcome({ onSignUp, onSignIn }: { onSignUp: () => void; onSignIn
             onClick={() => handleAction(onSignUp)}
             className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-lavender-500 to-lavender-600 py-3.5 text-sm font-semibold text-white shadow-soft-lg transition-all hover:shadow-lg active:scale-[0.97]"
           >
-            <GraduationCap className="h-4 w-4" />
-            Sign Up
+            Next
             <ArrowRight className="h-4 w-4" />
           </button>
-          <button
-            onClick={() => handleAction(onSignIn)}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-lavender-100 bg-white py-3.5 text-sm font-semibold text-gray-600 transition-all hover:bg-lavender-50 active:scale-[0.97]"
-          >
-            <LogIn className="h-4 w-4" />
-            Login
-          </button>
+        </div>
+
+        {/* Onboarding indicators */}
+        <div className="mt-6 flex gap-1.5">
+          <span className="h-2 w-2 rounded-full bg-lavender-300" />
+          <span className="h-2 w-2 rounded-full bg-lavender-500" />
+          <span className="h-2 w-2 rounded-full bg-lavender-300" />
         </div>
       </div>
     </div>

@@ -13,6 +13,17 @@ import {
   RefreshCw,
   School,
 } from 'lucide-react';
+
+function ReNectLogo() {
+  return (
+    <div className="flex flex-col items-center">
+      <h1 className="text-3xl font-bold tracking-tight text-gray-800">
+        Re<span className="text-lavender-600">Nect</span>
+      </h1>
+      <Leaf className="mt-1.5 h-5 w-5 text-lavender-500" strokeWidth={2.5} />
+    </div>
+  );
+}
 import { useApp } from '../store';
 
 type Mode = 'login' | 'signup' | 'otp';
@@ -250,14 +261,9 @@ export function Login() {
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-lavender-50 via-white to-babyblue-50 px-4 py-8">
       <div className="flex w-full max-w-md flex-col">
         <div className="mb-8 flex flex-col items-center text-center">
-          <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-lavender-400 to-lavender-600 shadow-soft-lg">
-            <Leaf className="h-10 w-10 text-white" />
-          </div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-800">
-            Re<span className="text-lavender-600">Nect</span>
-          </h1>
-          <p className="mt-2 text-sm text-gray-400">
-            Borrow, lend and reuse within your campus
+          <ReNectLogo />
+          <p className="mt-3 text-sm text-gray-400">
+            Sign in to continue
           </p>
         </div>
 
