@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import { X, Loader2, AlertCircle, AlertTriangle } from 'lucide-react';
+import { formatOwnerName } from './ui';
 
 interface Props {
   itemName: string;
   borrowerName: string;
+  borrowerStudentId?: string;
   onSubmit: (amount: number, reason: string) => Promise<{ error: string | null }>;
   onClose: () => void;
 }
 
-export function DamagePenaltyModal({ itemName, borrowerName, onSubmit, onClose }: Props) {
+export function DamagePenaltyModal({ itemName, borrowerName, borrowerStudentId, onSubmit, onClose }: Props) {
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -42,7 +44,7 @@ export function DamagePenaltyModal({ itemName, borrowerName, onSubmit, onClose }
         <div className="mb-4 flex items-center gap-2 rounded-xl bg-amber-50 px-4 py-3">
           <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
           <p className="text-xs text-amber-700">
-            Issue a penalty to <span className="font-semibold">{borrowerName}</span> for damage to <span className="font-semibold">{itemName}</span>. The borrower will be notified and can pay via online or offline method.
+            Issue a penalty to <span className="font-semibold">{formatOwnerName(borrowerName, borrowerStudentId || '')}</span> for damage to <span className="font-semibold">{itemName}</span>. The borrower will be notified and can pay via online or offline method.
           </p>
         </div>
 

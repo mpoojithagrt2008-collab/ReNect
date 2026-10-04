@@ -13,11 +13,12 @@ import { Favorites } from './pages/Favorites';
 import { Profile } from './pages/Profile';
 import { Onboarding, hasSeenOnboarding } from './components/Onboarding';
 import { Welcome } from './pages/Welcome';
+import { CompleteProfile } from './components/CompleteProfile';
 
 type OnboardingState = 'animation' | 'welcome' | 'done';
 
 function AppContent() {
-  const { user, authLoading } = useApp();
+  const { user, authLoading, needsProfileSetup } = useApp();
   const [page, setPage] = useState<Page>('home');
 
   const initialOnboardingState: OnboardingState =
@@ -52,6 +53,7 @@ function AppContent() {
   }
 
   if (!user) return <Login />;
+  if (needsProfileSetup) return <CompleteProfile />;
 
   const navigate = (p: Page) => setPage(p);
 

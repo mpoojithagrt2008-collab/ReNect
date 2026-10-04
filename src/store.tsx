@@ -95,6 +95,9 @@ interface AppContextType {
   createPayment: (requestId: string, listingId: string, payeeId: string, amount: number, purpose: 'rental' | 'penalty', method: PaymentMethod, penaltyId?: string | null) => Promise<{ error: string | null; paymentId?: string }>;
   verifyPayment: (paymentId: string, approved: boolean) => Promise<{ error: string | null }>;
   fetchPayments: () => Promise<void>;
+  signInWithGoogle: () => Promise<{ error: string | null }>;
+  needsProfileSetup: boolean;
+  completeProfileSetup: (studentId: string, college: string) => Promise<{ error: string | null }>;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -181,6 +184,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [damagePenalties, setDamagePenalties] = useState<DamagePenalty[]>([]);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [unreadByRequest, setUnreadByRequest] = useState<Record<string, number>>({});
+  const [needsProfileSetup, setNeedsProfileSetup] = useState(false);
   const sessionRef = useRef<Session | null>(null);
   const activeChatRef = useRef<string | null>(null);
   const messagesChannelRef = useRef<any>(null);
@@ -1026,6 +1030,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setDamagePenalties([]);
         setPayments([]);
         setUnreadByRequest({});
+        setNeedsProfileSetup(false);
         setActiveChatRequestId(null);
         activeChatRef.current = null;
         setAuthLoading(false);
@@ -1048,6 +1053,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           }
           if (!mounted) return;
           setUser(profile);
+          setNeedsProfileSetup(!profile.studentId);
           fetchRequests(session.user.id);
           fetchNotifications();
           fetchFavorites();
@@ -1331,6 +1337,45 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const signInWithGoogle = useCallback(async (): Promise<{ error: string | null }> => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin,
+        },
+      });
+      if (error) {
+        if (isNetworkError(error)) {
+          return { error: 'Unable to connect to the server. Please check your internet connection and try again.' };
+        }
+        return { error: error.message };
+      }
+      return { error: null };
+    } catch (err: any) {
+      if (isNetworkError(err)) {
+        return { error: 'Unable to connect to the server. Please check your internet connection and try again.' };
+      }
+      return { error: 'Google sign-in failed. Please try again.' };
+    }
+  }, []);
+
+  const completeProfileSetup = useCallback(async (studentId: string, college: string): Promise<{ error: string | null }> => {
+    if (!user) return { error: 'Not logged in.' };
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ student_id: studentId, college })
+        .eq('id', user.id);
+      if (error) return { error: 'Failed to save profile. Please try again.' };
+      setUser({ ...user, studentId, college });
+      setNeedsProfileSetup(false);
+      return { error: null };
+    } catch {
+      return { error: 'Failed to save profile. Please try again.' };
+    }
+  }, [user]);
+
   const login = useCallback(async (email: string, password: string): Promise<{ error: string | null }> => {
     const normalizedEmail = email.trim().toLowerCase();
     try {
@@ -1405,24 +1450,46 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const deleteAccount = useCallback(async (): Promise<{ error: string | null }> => {
     if (!user) return { error: 'Not logged in.' };
     const userId = user.id;
-    await supabase.from('listings').delete().eq('owner_id', userId);
-    await supabase.from('rent_requests').delete().eq('requester_id', userId);
-    await supabase.from('profiles').delete().eq('id', userId);
-    await supabase.auth.signOut();
-    setUser(null);
-    setItems([]);
-    setRequests([]);
-    setProfilesMap({});
-    setSelectedItemId(null);
-    setNotifications([]);
-    setMessages([]);
-    setFavorites([]);
-    setReturns([]);
-    setDamagePenalties([]);
-    setPayments([]);
-    setActiveChatRequestId(null);
-    setUnreadByRequest({});
-    return { error: null };
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return { error: 'No active session.' };
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const response = await fetch(`${supabaseUrl}/functions/v1/delete-user`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        return { error: body.error || 'Failed to delete account. Please try again.' };
+      }
+
+      await supabase.auth.signOut();
+      setUser(null);
+      setItems([]);
+      setRequests([]);
+      setProfilesMap({});
+      setSelectedItemId(null);
+      setNotifications([]);
+      setMessages([]);
+      setFavorites([]);
+      setReturns([]);
+      setDamagePenalties([]);
+      setPayments([]);
+      setActiveChatRequestId(null);
+      setUnreadByRequest({});
+      setNeedsProfileSetup(false);
+      return { error: null };
+    } catch (err: any) {
+      if (isNetworkError(err)) {
+        return { error: 'Unable to connect to the server. Please check your internet connection and try again.' };
+      }
+      return { error: 'Failed to delete account. Please try again.' };
+    }
   }, [user]);
 
   const addListing = useCallback(async (data: {
@@ -1645,6 +1712,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         verifyOtp,
         resendOtp,
         login,
+        signInWithGoogle,
+        needsProfileSetup,
+        completeProfileSetup,
         logout,
         deleteAccount,
         items,
